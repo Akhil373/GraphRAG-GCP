@@ -1,5 +1,0 @@
-Flask
-Flask-CORS
-neo4j
-vertexai
-gunicorn # For production/Cloud Run
