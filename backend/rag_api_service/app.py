@@ -10,6 +10,9 @@ from vertexai.language_models import TextEmbeddingModel
 from vertexai.generative_models import GenerativeModel
 from google.api_core.exceptions import GoogleAPIError
 import re # Added for regex pattern matching
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # --- Flask App Initialization ---
 app = Flask(__name__)
@@ -546,109 +549,27 @@ def retrieve_graph_context(query_embedding, user_query, session):
 def retrieve_file_specific_context(query_embedding, user_query, repo_id, file_path, session, context_json=None):
     """
     Retrieves relevant context from the Neo4j graph, focused specifically on the selected file.
+    It first attempts a vector search for the most relevant code sections. If found, it returns
+    a focused context. Otherwise, it falls back to a general context of all entities in the file.
     """
     context = []
     
     try:
-        # If context_json is provided, we can use it directly
-        if context_json:
-            try:
-                file_data = json.loads(context_json)
-                # Format the context data
-                context.append(f"FILE: {file_path}")
-                if file_data.get('language'):
-                    context.append(f"LANGUAGE: {file_data['language']}")
-                if file_data.get('context_sample'):
-                    context.append(f"CODE SAMPLE:\n```{file_data['language']}\n{file_data['context_sample'][:1000]}\n```\n")
-            except json.JSONDecodeError:
-                app.logger.error("Could not parse provided context JSON")
-        
-        # Query for entities directly related to this file
-        file_query = """
-        MATCH (f:File {repo_id: $repo_id, path: $file_path})
-        OPTIONAL MATCH (f)-[r]->(e)
-        RETURN type(r) as relationship_type, e
-        LIMIT 30
-        """
-        
-        file_results = session.run(file_query, repo_id=repo_id, file_path=file_path).data()
-        
-        if file_results:
-            # Group entities by relationship type
-            entities_by_type = {}
-            for result in file_results:
-                rel_type = result.get('relationship_type')
-                entity = result.get('e')
-                
-                if rel_type and entity:
-                    if rel_type not in entities_by_type:
-                        entities_by_type[rel_type] = []
-                    
-                    # Format the entity data
-                    entity_data = dict(entity)
-                    entity_type = list(entity.labels)[0] if entity.labels else "Unknown"
-                    
-                    entities_by_type[rel_type].append({
-                        "type": entity_type,
-                        "data": entity_data
-                    })
-            
-            # Format the context by relationship type
-            for rel_type, entities in entities_by_type.items():
-                context.append(f"\n{rel_type.upper()} RELATIONSHIPS:")
-                for entity in entities:
-                    entity_type = entity["type"]
-                    entity_data = entity["data"]
-                    
-                    if entity_type == "Function":
-                        context.append(f"- FUNCTION: {entity_data.get('name', 'Unnamed')}")
-                        if entity_data.get('description'):
-                            context.append(f"  DESCRIPTION: {entity_data.get('description')}")
-                        if entity_data.get('properties') and entity_data['properties'].get('params'):
-                            context.append(f"  PARAMETERS: {', '.join(entity_data['properties']['params'])}")
-                        if entity_data.get('properties') and entity_data['properties'].get('return_type'):
-                            context.append(f"  RETURN TYPE: {entity_data['properties']['return_type']}")
-                        if entity_data.get('properties') and entity_data['properties'].get('context_sample'):
-                            context.append(f"  CODE SNIPPET:\n```\n{entity_data['properties']['context_sample'][:500]}\n```\n")
-                    
-                    elif entity_type == "Variable":
-                        context.append(f"- VARIABLE: {entity_data.get('name', 'Unnamed')}")
-                        if entity_data.get('description'):
-                            context.append(f"  DESCRIPTION: {entity_data.get('description')}")
-                        if entity_data.get('properties') and entity_data['properties'].get('data_type'):
-                            context.append(f"  TYPE: {entity_data['properties']['data_type']}")
-                    
-                    elif entity_type == "Class":
-                        context.append(f"- CLASS: {entity_data.get('name', 'Unnamed')}")
-                        if entity_data.get('description'):
-                            context.append(f"  DESCRIPTION: {entity_data.get('description')}")
-                        if entity_data.get('properties') and entity_data['properties'].get('fields'):
-                            context.append(f"  FIELDS: {', '.join(entity_data['properties']['fields'])}")
-                        if entity_data.get('properties') and entity_data['properties'].get('context_sample'):
-                            context.append(f"  CODE SNIPPET:\n```\n{entity_data['properties']['context_sample'][:500]}\n```\n")
-                    
-                    elif entity_type == "Operation":
-                        context.append(f"- OPERATION: {entity_data.get('name', 'Unnamed')}")
-                        if entity_data.get('description'):
-                            context.append(f"  DESCRIPTION: {entity_data.get('description')}")
-                        if entity_data.get('properties') and entity_data['properties'].get('code_snippet'):
-                            context.append(f"  CODE SNIPPET:\n```\n{entity_data['properties']['code_snippet'][:500]}\n```\n")
-                    
-                    else:
-                        # For other entity types
-                        context.append(f"- {entity_type}: {entity_data.get('name', 'Unnamed')}")
-                        if entity_data.get('description'):
-                            context.append(f"  DESCRIPTION: {entity_data.get('description')}")
-
-        # Also perform a vector search to find similar code snippets in the file
+        # --- 1. Vector Search First ---
+        # Attempt to find the most relevant code snippets in the file to provide a focused context.
         vector_query = """
         MATCH (f:File {repo_id: $repo_id, path: $file_path})-[:CONTAINS]->(e)
         WHERE e:Function OR e:Class OR e:Operation
-        WITH e, vector.similarity(e.embedding, $embedding) AS score
-        WHERE score > 0.7
-        RETURN e
+        WITH e
+        CALL db.index.vector.queryNodes(CASE 
+            WHEN e:Function THEN 'function_index' 
+            WHEN e:Operation THEN 'operation_index'
+            ELSE '' END, 
+            3, $embedding) YIELD node, score
+        WHERE node = e AND score > 0.7
+        RETURN e, score
         ORDER BY score DESC
-        LIMIT 2
+        LIMIT 3
         """
         
         vector_results = session.run(vector_query, 
@@ -656,25 +577,146 @@ def retrieve_file_specific_context(query_embedding, user_query, repo_id, file_pa
                                      file_path=file_path,
                                      embedding=query_embedding).data()
         
+        # --- 2. Build Context Based on Search Results ---
         if vector_results:
-            context.append("\nRELEVANT CODE SECTIONS:")
+            app.logger.info(f"Found {len(vector_results)} relevant sections via vector search. Building focused context.")
+            context.append(f"FILE: {file_path}")
+            
+            # Add the general file code sample if available
+            if context_json:
+                try:
+                    file_data = json.loads(context_json)
+                    if file_data.get('context_sample'):
+                        context.append(f"CODE SAMPLE:\n```{file_data.get('language', '')}\n{file_data['context_sample'][:1000]}\n```\n")
+                except json.JSONDecodeError:
+                    app.logger.error("Could not parse provided context JSON for focused view.")
+
+            context.append("\nMOST RELEVANT CODE SECTIONS:")
             for result in vector_results:
                 entity = result.get('e')
+                score = result.get('score', 0)
                 if entity:
                     entity_data = dict(entity)
-                    entity_type = list(entity.labels)[0] if entity.labels else "Unknown"
+                    entity_type = "Unknown"
+                    if hasattr(entity, 'labels'):
+                        entity_type = list(entity.labels)[0] if entity.labels else "Unknown"
+                    elif isinstance(entity, dict) and entity.get('labels'):
+                        entity_type = entity.get('labels')[0] if entity.get('labels') else "Unknown"
                     
-                    context.append(f"- {entity_type}: {entity_data.get('name', 'Unnamed')}")
+                    context.append(f"\n- {entity_type}: {entity_data.get('name', 'Unnamed')} (Relevance: {score:.2f})")
                     if entity_data.get('description'):
                         context.append(f"  DESCRIPTION: {entity_data.get('description')}")
                     
                     # Get code snippet from properties based on entity type
                     if entity_type == "Function" or entity_type == "Class":
-                        if entity_data.get('properties') and entity_data['properties'].get('context_sample'):
-                            context.append(f"  CODE SNIPPET:\n```\n{entity_data['properties']['context_sample'][:1000]}\n```\n")
+                        if entity_data.get('context_sample'):
+                            context.append(f"  CODE SNIPPET:\n```\n{entity_data.get('context_sample')[:1000]}\n```\n")
                     elif entity_type == "Operation":
-                        if entity_data.get('properties') and entity_data['properties'].get('code_snippet'):
-                            context.append(f"  CODE SNIPPET:\n```\n{entity_data['properties']['code_snippet'][:1000]}\n```\n")
+                        if entity_data.get('code_snippet'):
+                            context.append(f"  CODE SNIPPET:\n```\n{entity_data.get('code_snippet')[:1000]}\n```\n")
+            
+            # Return the focused context immediately
+            return "\n".join(context)
+
+        # --- 3. Fallback to General Context ---
+        # If no highly relevant snippets are found, build a general context of the file.
+        else:
+            app.logger.info("No high-relevance sections found via vector search. Building general file context.")
+            # If context_json is provided, we can use it directly
+            if context_json:
+                try:
+                    file_data = json.loads(context_json)
+                    # Format the context data
+                    context.append(f"FILE: {file_path}")
+                    if file_data.get('language'):
+                        context.append(f"LANGUAGE: {file_data['language']}")
+                    if file_data.get('context_sample'):
+                        context.append(f"CODE SAMPLE:\n```{file_data['language']}\n{file_data['context_sample'][:1000]}\n```\n")
+                except json.JSONDecodeError:
+                    app.logger.error("Could not parse provided context JSON")
+            
+            # Query for entities directly related to this file
+            file_query = """
+            MATCH (f:File {repo_id: $repo_id, path: $file_path})
+            OPTIONAL MATCH (f)-[r]->(e)
+            RETURN type(r) as relationship_type, e
+            LIMIT 30
+            """
+            
+            file_results = session.run(file_query, repo_id=repo_id, file_path=file_path).data()
+            
+            if file_results:
+                # Group entities by relationship type
+                entities_by_type = {}
+                for result in file_results:
+                    rel_type = result.get('relationship_type')
+                    entity = result.get('e')
+                    
+                    if rel_type and entity:
+                        if rel_type not in entities_by_type:
+                            entities_by_type[rel_type] = []
+                        
+                        # Format the entity data
+                        entity_data = dict(entity)
+                        entity_type = "Unknown"
+                        
+                        # Check if entity is a Neo4j Node object or a dict
+                        if hasattr(entity, 'labels'):
+                            entity_type = list(entity.labels)[0] if entity.labels else "Unknown"
+                        elif isinstance(entity, dict) and entity.get('labels'):
+                            entity_type = entity.get('labels')[0] if entity.get('labels') else "Unknown"
+                        
+                        entities_by_type[rel_type].append({
+                            "type": entity_type,
+                            "data": entity_data
+                        })
+                
+                # Format the context by relationship type
+                for rel_type, entities in entities_by_type.items():
+                    context.append(f"\n{rel_type.upper()} RELATIONSHIPS:")
+                    for entity in entities:
+                        entity_type = entity["type"]
+                        entity_data = entity["data"]
+                        
+                        if entity_type == "Function":
+                            context.append(f"- FUNCTION: {entity_data.get('name', 'Unnamed')}")
+                            if entity_data.get('description'):
+                                context.append(f"  DESCRIPTION: {entity_data.get('description')}")
+                            if entity_data.get('params'):
+                                context.append(f"  PARAMETERS: {str(entity_data.get('params'))}")
+                            if entity_data.get('return_type'):
+                                context.append(f"  RETURN TYPE: {str(entity_data.get('return_type'))}")
+                            if entity_data.get('context_sample'):
+                                context.append(f"  CODE SNIPPET:\n```\n{entity_data.get('context_sample')[:500]}\n```\n")
+                        
+                        elif entity_type == "Variable":
+                            context.append(f"- VARIABLE: {entity_data.get('name', 'Unnamed')}")
+                            if entity_data.get('description'):
+                                context.append(f"  DESCRIPTION: {entity_data.get('description')}")
+                            if entity_data.get('data_type'):
+                                context.append(f"  TYPE: {str(entity_data.get('data_type'))}")
+                        
+                        elif entity_type == "Class":
+                            context.append(f"- CLASS: {entity_data.get('name', 'Unnamed')}")
+                            if entity_data.get('description'):
+                                context.append(f"  DESCRIPTION: {entity_data.get('description')}")
+                            if entity_data.get('fields'):
+                                context.append(f"  FIELDS: {str(entity_data.get('fields'))}")
+                            if entity_data.get('context_sample'):
+                                context.append(f"  CODE SNIPPET:\n```\n{entity_data.get('context_sample')[:500]}\n```\n")
+                        
+                        elif entity_type == "Operation":
+                            context.append(f"- OPERATION: {entity_data.get('name', 'Unnamed')}")
+                            if entity_data.get('description'):
+                                context.append(f"  DESCRIPTION: {entity_data.get('description')}")
+                            if entity_data.get('code_snippet'):
+                                context.append(f"  CODE SNIPPET:\n```\n{entity_data.get('code_snippet')[:500]}\n```\n")
+                        
+                        else:
+                            # For other entity types
+                            context.append(f"- {entity_type}: {entity_data.get('name', 'Unnamed')}")
+                            if entity_data.get('description'):
+                                context.append(f"  DESCRIPTION: {entity_data.get('description')}")
 
     except Exception as e:
         app.logger.error(f"Error retrieving file-specific context: {e}", exc_info=True)

@@ -114,8 +114,6 @@ def ingest_data_to_neo4j(parsed_data, session):
         context_sample=context_sample
     )
 
-    # Track import files for later processing
-    import_entities = []
     # Track operation entities for specialized handling
     operation_entities = []
 
@@ -178,11 +176,6 @@ def ingest_data_to_neo4j(parsed_data, session):
         entity_type = entity.get('entity_type', 'Entity') 
         description = entity.get('description', '')
         
-        # Handle imports differently
-        if entity_type.lower() == 'import':
-            import_entities.append(entity)
-            continue
-            
         # Handle operations differently
         if entity_type.lower() == 'operation':
             operation_entities.append(entity)
@@ -296,81 +289,6 @@ def ingest_data_to_neo4j(parsed_data, session):
             'source_file': source_file,
             'repo_id': repo_id
         })
-    
-    # Process imports after all entities are created
-    for import_entity in import_entities:
-        import_name = import_entity.get('name')
-        properties = import_entity.get('properties', {})
-        is_standard_library = properties.get('is_standard_library', False)
-        source_file = properties.get('source_file', os.path.basename(filename))
-        
-        # Check if the imported file exists in our database
-        result = session.run(
-            """
-            MATCH (f) 
-            WHERE f.name = $import_name OR f.path ENDS WITH $import_name
-            RETURN f.path as path, f.name as name, count(f) as count
-            """,
-            {"import_name": import_name}
-        ).single()
-        
-        if result and result["count"] > 0:
-            # Found existing file - create relationship to it
-            target_file_path = result["path"]
-            target_file_name = result["name"]
-            
-            print(f"Creating import relationship: {source_file} imports {target_file_name}")
-            session.run(
-                """
-                MATCH (source:{file_type} {name: $source_file, repo_id: $repo_id})
-                MATCH (target) 
-                WHERE target.path = $target_path
-                MERGE (source)-[r:IMPORTS]->(target)
-                SET r.context = $context
-                """.format(file_type=file_type),
-                {
-                    "source_file": source_file,
-                    "target_path": target_file_path,
-                    "context": f"File {source_file} imports {target_file_name}",
-                    "repo_id": repo_id
-                }
-            )
-        else:
-            # Create placeholder node for the imported file
-            import_file_type = "ExternalModule"
-            if is_standard_library:
-                import_file_type = "StandardLibrary"
-                
-            print(f"Creating placeholder for import: {import_name} (type: {import_file_type})")
-            
-            # Create the placeholder node
-            session.run(
-                f"""
-                MERGE (imp:{import_file_type} {{name: $import_name}})
-                ON CREATE SET imp.description = $description, imp.is_placeholder = true
-                """,
-                {
-                    "import_name": import_name,
-                    "description": f"External module {import_name} imported by {source_file} but not available in the repository"
-                }
-            )
-            
-            # Create relationship to the placeholder
-            session.run(
-                """
-                MATCH (source:{file_type} {name: $source_file, repo_id: $repo_id})
-                MATCH (target) 
-                WHERE target.name = $import_name AND target.is_placeholder = true
-                MERGE (source)-[r:IMPORTS]->(target)
-                SET r.context = $context
-                """.format(file_type=file_type),
-                {
-                    "source_file": source_file,
-                    "import_name": import_name,
-                    "context": f"File {source_file} imports external module {import_name}",
-                    "repo_id": repo_id
-                }
-            )
 
     # Comprehensive mapping of relationship types based on user requirements
     rel_mapping = {
@@ -430,13 +348,9 @@ def ingest_data_to_neo4j(parsed_data, session):
         target_name = rel.get('target')
         rel_type = rel.get('relationship_type', 'RELATED_TO')
         
-        # Skip import relationships as they're handled above
-        if rel_type.lower() == 'imports':
-            continue
-        
         # Ensure rel_type is a string before using lower()
         rel_type_str = str(rel_type).lower() if rel_type else 'related_to'
-        rel_type_upper = rel_mapping.get(rel_type_str, rel_type_str).upper()
+        rel_type_upper = rel_mapping.get(rel_type_str, rel_type_str.upper())
         
         # Sanitize rel_type to prevent Cypher injection
         sanitized_rel_type = re.sub(r'[^A-Z_]', '', rel_type_upper)
@@ -447,8 +361,8 @@ def ingest_data_to_neo4j(parsed_data, session):
         # Improved relationship creation with better matching
         # This works with the unique entity names
         cypher = f"""
-        MATCH (source {{name: $source_name, file_path: $filename}})
-        MATCH (target {{name: $target_name, file_path: $filename}})
+        MATCH (source {{name: $source_name, file_path: $filename, repo_id: $repo_id}})
+        MATCH (target {{name: $target_name, repo_id: $repo_id}})
         MERGE (source)-[r:{sanitized_rel_type}]->(target)
         SET r.context = $context
         """
@@ -457,7 +371,8 @@ def ingest_data_to_neo4j(parsed_data, session):
             'source_name': source_name,
             'target_name': target_name,
             'filename': filename,
-            'context': rel.get('context', '')
+            'context': rel.get('context', ''),
+            'repo_id': repo_id
         })
 
     print(f"Ingested data for {filename} into Neo4j with enhanced entity and relationship handling.")

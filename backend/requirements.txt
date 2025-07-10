@@ -1,7 +1,10 @@
-Flask==2.2.3
-Flask-Cors==3.0.10
-google-cloud-storage==2.10.0
-neo4j==5.14.0
-GitPython==3.1.40
-requests==2.31.0
+Flask
+Flask-Cors
+google-cloud-storage
+neo4j
+GitPython
+requests
 gunicorn
+vertexai
+python-dotenv
+google-cloud-aiplatform
