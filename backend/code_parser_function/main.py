@@ -8,11 +8,8 @@ import re
 from vertexai.generative_models import GenerativeModel
 import vertexai
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# --- Data Classes for Code Structure ---
 
 class CodeEntity:
     def __init__(self, name: str, entity_type: str, file_path: str, description: str = "", properties: Dict[str, Any] = None):
@@ -24,7 +21,6 @@ class CodeEntity:
     
     def to_dict(self):
         result = self.__dict__.copy()
-        # Only include properties if they exist and aren't empty
         if not self.properties:
             del result['properties']
         return result
@@ -39,20 +35,14 @@ class CodeRelationship:
     def to_dict(self):
         return self.__dict__
 
-# --- The Core Parsing Logic ---
-
 class CodeParser:
     def __init__(self):
-        # Initialize Vertex AI
         project_id = os.environ.get('GCP_PROJECT_ID')
-        # Location must be set for Vertex AI to initialize correctly
         location = os.environ.get('GCP_REGION', 'us-central1')
         vertexai.init(project=project_id, location=location)
         self.model = GenerativeModel('gemini-1.5-flash')
 
-        # Language detection patterns - expanded with more languages
         self.language_patterns = {
-            # Legacy languages
             'cobol': [r'\.cob$', r'\.cbl$', r'\.cpy$', r'IDENTIFICATION\s+DIVISION', r'PROGRAM-ID', r'PROCEDURE\s+DIVISION', r'DATA\s+DIVISION'],
             'jcl': [r'\.jcl$', r'//\w+\s+JOB', r'//\w+\s+EXEC', r'//\w+\s+DD', r'//SYSOUT'],
             'sas': [r'\.sas$', r'proc\s+\w+', r'data\s+\w+', r'run;', r'libname\s+', r'%macro', r'%mend'],
@@ -61,8 +51,6 @@ class CodeParser:
             'fortran': [r'\.for$', r'\.f$', r'\.f77$', r'\.f90$', r'program\s+\w+', r'subroutine\s+\w+', r'function\s+\w+', r'end\s+program'],
             'pli': [r'\.pli$', r'\.pl1$', r'PROCEDURE\s+OPTIONS', r'DECLARE', r'END;'],
             'assembly': [r'\.asm$', r'\.s$', r'\.S$', r'section\s+\.text', r'global\s+_start', r'\.data', r'\.bss'],
-            
-            # Modern languages
             'c': [r'\.c$', r'\.h$', r'#include\s*<', r'int\s+main\s*\('],
             'cpp': [r'\.cpp$', r'\.cc$', r'\.cxx$', r'\.hpp$', r'#include\s*<iostream>', r'using\s+namespace'],
             'python': [r'\.py$', r'import\s+', r'def\s+', r'class\s+'],
@@ -76,7 +64,6 @@ class CodeParser:
         }
 
     def detect_language(self, file_path: str, content: str) -> str:
-        """Detect programming language from file path and content."""
         for language, patterns in self.language_patterns.items():
             score = 0
             for pattern in patterns:
@@ -89,10 +76,6 @@ class CodeParser:
         return 'unknown'
 
     def get_full_function_body(self, content_lines: List[str], start_line: int) -> str:
-        """
-        Extracts the full body of a function starting from a specific line,
-        by counting curly braces with improved handling.
-        """
         if start_line >= len(content_lines):
             return ""
 
@@ -101,11 +84,9 @@ class CodeParser:
         in_function = False
         found_first_brace = False
 
-        # Start from the line where the function is declared
         for i in range(start_line, len(content_lines)):
             line = content_lines[i]
             
-            # Track both opening and closing braces
             open_braces = line.count('{')
             close_braces = line.count('}')
             
@@ -114,7 +95,7 @@ class CodeParser:
                 found_first_brace = True
                 brace_count += open_braces - close_braces
                 function_body.append(line)
-                if brace_count <= 0:  # Handle single-line functions
+                if brace_count <= 0:
                     break
                 continue
                     
@@ -123,18 +104,15 @@ class CodeParser:
                 brace_count += open_braces
                 brace_count -= close_braces
                 
-                # End of function detected
                 if brace_count <= 0:
                     break
                 
         return '\n'.join(function_body)
 
     def parse_content(self, file_path: str, content: str) -> Tuple[List[CodeEntity], List[CodeRelationship], str]:
-        """Parse the content of a single file."""
         language = self.detect_language(file_path, content)
         logger.info(f"Detected language for {file_path}: {language}")
         
-        # Store the first 2000 characters as context sample
         context_sample = content[:2000]
         
         ai_entities, ai_relationships = self.extract_with_ai(content, language, file_path)
@@ -147,9 +125,7 @@ class CodeParser:
         return ai_entities, ai_relationships, context_sample
 
     def extract_with_ai(self, content: str, language: str, file_path: str) -> Tuple[List[CodeEntity], List[CodeRelationship]]:
-        """Extract entities and relationships using Vertex AI."""
         try:
-            # Enhanced prompt with more specific instructions and property extraction
             prompt = f"""
             Analyze this {language} code and extract detailed information in a structured format.
 
@@ -258,15 +234,12 @@ class CodeParser:
                 content_lines = content.split('\n')
 
                 for entity_data in parsed_data.get('entities', []):
-                    # Extract all fields including any additional properties
                     properties = entity_data.get('properties', {})
                     
-                    # If properties are missing, try to extract them from top-level keys
                     for key, value in entity_data.items():
                         if key not in ['name', 'entity_type', 'description', 'properties'] and value is not None:
                             properties[key] = value
                     
-                    # For functions, get the full function body
                     if entity_data.get('entity_type') == 'Function' and properties.get('line_number'):
                         line_number = properties.get('line_number', 1) - 1 # Adjust for 0-based index
                         function_code = self.get_full_function_body(content_lines, line_number)
@@ -305,16 +278,12 @@ class CodeParser:
             return [], []
 
     def extract_with_regex(self, content: str, language: str, file_path: str) -> Tuple[List[CodeEntity], List[CodeRelationship]]:
-        """Enhanced fallback regex-based extraction with full function body capture"""
         entities = []
         relationships = []
-        # Split content into lines for potential function body extraction
         content_lines = content.split('\n')
         
-        # Define languages that use braces for function bodies
         brace_languages = {'c', 'cpp', 'java', 'javascript', 'typescript', 'csharp', 'php', 'go', 'ruby', 'rpg', 'flink', 'fortran', 'pli', 'assembly'}
         
-        # Enhanced patterns dictionary with more languages and entity types
         patterns = {
             'cobol': {
                 'paragraph': r'^[ ]*([A-Z0-9][A-Z0-9-]*)\s*\.',
@@ -379,14 +348,11 @@ class CodeParser:
             }
         }
         
-        # Get patterns for the detected language or use generic ones
         lang_patterns = patterns.get(language, patterns['unknown'])
         
-        # Extract filename for unique entity naming
         filename = os.path.basename(file_path)
         filename_base = os.path.splitext(filename)[0]
         
-        # Create a file entity first
         file_entity = CodeEntity(
             name=filename,
             entity_type='source_file',
@@ -400,34 +366,24 @@ class CodeParser:
         )
         entities.append(file_entity)
         
-        # No special handling for header files to avoid confusion
-        
-        # Extract entities based on patterns
         for entity_type, pattern in lang_patterns.items():
             for match in re.finditer(pattern, content, re.MULTILINE if language == 'cobol' else re.IGNORECASE | re.MULTILINE):
                 try:
                     name = match.group(1)
                 except IndexError:
-                    # Some patterns might not have capture groups
                     continue
                 
-                # Get the code snippet around this entity for better context
                 line_start = content[:match.start()].count('\n') + 1
                 line_end = line_start + content[match.start():match.end()].count('\n') + 1
                 
-                # Skip if name is too short or starts with underscore (often internal/private)
                 if len(name) <= 1 and not name.isalnum():
                     continue
                 
-                # Create a unique name by appending the filename
                 unique_name = f"{name}-{filename_base}"
                 
-                # Special handling for includes in C/C++
                 if entity_type in ('include', 'system_include', 'project_include', 'import', 'from_import'):
-                    # Create a simpler include entity type, without distinguishing between system/project headers
                     is_standard_library = False
                     
-                    # Try to detect if this is a standard library import
                     if language in ('c', 'cpp'):
                         is_standard_library = '<' in match.group(0) and '>' in match.group(0)
                     elif language == 'python':
@@ -436,7 +392,7 @@ class CodeParser:
                         is_standard_library = name.split('.')[0] in standard_libs
                     
                     include_entity = CodeEntity(
-                        name=name,  # Keep original name for imports
+                        name=name,
                         entity_type='import',
                         file_path=file_path,
                         description=f"Import {name} in {filename}",
@@ -449,28 +405,25 @@ class CodeParser:
                     )
                     entities.append(include_entity)
                     
-                    # Add import relationship between file and import
                     relationships.append(CodeRelationship(
-                        source=filename,  # Use filename directly
-                        target=name,      # Use original import name
+                        source=filename,
+                        target=name,
                         relationship_type='imports',
                         context=f"{filename} imports {name}"
                     ))
                     continue
                     
-                # Get surrounding code for description
                 start_pos = max(0, match.start() - 100)
                 end_pos = min(len(content), match.end() + 200)
                 context_code = content[start_pos:end_pos]
                 
-                # Add entity with enhanced metadata
                 entity = CodeEntity(
-                    name=unique_name,  # Use the unique name with filename
+                    name=unique_name,
                     entity_type=entity_type,
                     file_path=file_path,
                     description=f"{entity_type.capitalize()} '{name}' in {filename}",
                     properties={
-                        "original_name": name,  # Store the original name for reference
+                        "original_name": name,
                         "line_number": line_start,
                         "code_length": line_end - line_start,
                         "context_sample": context_code[:500] if len(context_code) > 500 else context_code,
@@ -479,7 +432,6 @@ class CodeParser:
                 )
                 entities.append(entity)
                 
-                # Capture full function body for supported languages
                 if entity_type in ['function', 'method']:
                     if language in ['c', 'cpp', 'java', 'csharp', 'javascript', 'typescript', 'php']:
                         # Use brace counting for C-like languages
@@ -528,11 +480,8 @@ class CodeParser:
                     context=f"File {filename} defines {entity_type} {name}"
                 ))
         
-        # Enhanced relationship detection - more sophisticated, but now with unique names
         if len(entities) > 1:
-            # Process each entity to find potential relationships
             for i, entity in enumerate(entities):
-                # Skip the file entity and import entities for relationship detection
                 if entity.entity_type in ('source_file', 'import'):
                     continue
                     
@@ -621,16 +570,12 @@ class CodeParser:
         
         return entities, relationships
 
-# --- Cloud Function Entry Point ---
-
-# Initialize clients and parser globally to be reused across warm invocations
 storage_client = storage.Client()
 parser = CodeParser()
 PARSED_DATA_BUCKET = os.environ.get('PARSED_DATA_BUCKET')
 
 @functions_framework.cloud_event
 def code_parser_entrypoint(cloud_event):
-    """GCS-triggered Cloud Function to parse a single code file."""
     data = cloud_event.data
     bucket_name = data["bucket"]
     file_name = data["name"]
@@ -638,14 +583,12 @@ def code_parser_entrypoint(cloud_event):
     logger.info(f"Processing {file_name} from {bucket_name}.")
 
     try:
-        # Download file content
         source_bucket = storage_client.bucket(bucket_name)
         blob = source_bucket.blob(file_name)
         if not blob.exists():
             logger.error(f"File {file_name} does not exist.")
             return
 
-        # Get metadata to extract repo_id and file information
         metadata = blob.metadata or {}
         repo_id_from_metadata = metadata.get('repo_id')
         file_path_from_metadata = metadata.get('file_path')
@@ -663,16 +606,13 @@ def code_parser_entrypoint(cloud_event):
         else:
             content = raw_content.decode('utf-8', errors='replace')
 
-        # Parse the code
         entities, relationships, context_sample = parser.parse_content(file_name, content)
         
-        # Prepare data for upload with improved repo_id extraction
         repo_id = None
         if repo_id_from_metadata:
             repo_id = repo_id_from_metadata
             logger.info(f"Using repo_id from metadata: {repo_id}")
         else:
-            # Extract repo_id from path if format is cloned_repos/REPO_ID/...
             repo_id = file_name.split('/')[1] if file_name.startswith('cloned_repos/') and len(file_name.split('/')) > 2 else 'unknown_repo'
             logger.info(f"Extracted repo_id from path: {repo_id}")
         
@@ -685,16 +625,13 @@ def code_parser_entrypoint(cloud_event):
             "context_sample": context_sample
         }
         
-        # Upload results to the parsed data bucket
         if not PARSED_DATA_BUCKET:
             raise ValueError("PARSED_DATA_BUCKET environment variable not set.")
         
         destination_bucket = storage_client.bucket(PARSED_DATA_BUCKET)
-        # Create a unique name for the JSON output file
         destination_blob_name = f'parsed_data/{repo_id}/{os.path.basename(file_name)}.json'
         destination_blob = destination_bucket.blob(destination_blob_name)
         
-        # Set metadata on the destination blob to help with identification
         destination_blob.metadata = {
             "repo_id": repo_id,
             "original_file": file_name,

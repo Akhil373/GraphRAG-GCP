@@ -8,55 +8,47 @@ import requests
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from google.cloud import storage
-from git import Repo, GitCommandError # Using GitPython
-import stat # Keep this for Windows cleanup
+from git import Repo, GitCommandError
+import stat 
 from neo4j import GraphDatabase
 from dotenv import load_dotenv
 
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app) # Enable CORS for all routes
+CORS(app)
 
-# Initialize Google Cloud Storage client
 storage_client = storage.Client()
 GCS_BUCKET_NAME = os.getenv('GCS_BUCKET_NAME')
 
 CLONED_REPOS = {}
 
-# Dict to track processing progress
 PROCESSING_STATUS = {}
 
 def list_files_in_directory(path):
     """Recursively lists all files in a directory."""
     file_list = []
     for root, dirs, files in os.walk(path):
-        # Skip .git directories
         if '.git' in dirs:
             dirs.remove('.git')
             
-        # Skip any other hidden directories starting with dot
         dirs[:] = [d for d in dirs if not d.startswith('.')]
             
         for file in files:
-            # Skip files that start with .git or any hidden files
             if file.startswith('.git') or file.startswith('.'):
                 continue
                 
-            # Get path relative to the initial clone directory
             relative_path = os.path.relpath(os.path.join(root, file), path)
             file_list.append(relative_path)
     return file_list
 
 def remove_readonly(func, path, excinfo):
-    # Clear the readonly bit and reattempt the removal
     os.chmod(path, stat.S_IWRITE)
     func(path)
 
 def process_files_in_batches(repo_id, files_to_process, temp_repo_path):
     """Process files in batches"""
     try:
-        # Update status
         PROCESSING_STATUS[repo_id] = {
             "total_files": len(files_to_process),
             "processed": 0,
@@ -66,12 +58,11 @@ def process_files_in_batches(repo_id, files_to_process, temp_repo_path):
         }
 
         bucket = storage_client.bucket(GCS_BUCKET_NAME)
-        batch_size = 5  # Increased from 2 to 5
+        batch_size = 5
         total_processed = 0
         uploaded_files = []
         failed_files = []
 
-        # Process in batches
         for i in range(0, len(files_to_process), batch_size):
             batch = files_to_process[i:i+batch_size]
             batch_uploaded = []
@@ -80,15 +71,12 @@ def process_files_in_batches(repo_id, files_to_process, temp_repo_path):
                 try:
                     local_file_path = os.path.join(temp_repo_path, file_path)
                     if os.path.exists(local_file_path):
-                        # Update status
                         PROCESSING_STATUS[repo_id]["current_file"] = file_path
                         PROCESSING_STATUS[repo_id]["message"] = f"Processing {file_path}"
 
-                        # Define GCS destination path
                         destination_blob_name = f'cloned_repos/{repo_id}/{file_path}'
                         blob = bucket.blob(destination_blob_name)
                         
-                        # Add repo_id metadata to help with identification
                         metadata = {
                             "repo_id": repo_id,
                             "file_path": file_path,
@@ -100,7 +88,6 @@ def process_files_in_batches(repo_id, files_to_process, temp_repo_path):
                         uploaded_files.append(file_path)
                         batch_uploaded.append(file_path)
                         
-                        # Update counters
                         total_processed += 1
                         PROCESSING_STATUS[repo_id]["processed"] = total_processed
                         
@@ -111,24 +98,19 @@ def process_files_in_batches(repo_id, files_to_process, temp_repo_path):
                 except Exception as e:
                     print(f"Error processing file {file_path}: {e}")
                     failed_files.append(file_path)
-                    # Continue with the next file
             
-            # Wait longer for each batch to be processed before moving to the next batch
             if batch_uploaded:
                 PROCESSING_STATUS[repo_id]["message"] = f"Waiting for batch processing to complete ({total_processed}/{len(files_to_process)})"
-                time.sleep(10)  # Increased from 3 to 10 seconds
+                time.sleep(10)
                 
-                # Double check if files in this batch were processed before moving on
                 if repo_id in PROCESSING_STATUS and PROCESSING_STATUS[repo_id] is not None and "status" in PROCESSING_STATUS[repo_id] and PROCESSING_STATUS[repo_id]["status"] != "error":
                     PROCESSING_STATUS[repo_id]["message"] = f"Checking if batch was processed in Neo4j"
                     verify_batch_in_neo4j(repo_id, batch_uploaded)
 
-        # Record any failed files
         if failed_files:
             PROCESSING_STATUS[repo_id]["failed_files"] = failed_files
             print(f"Failed to process {len(failed_files)} files: {failed_files}")
 
-        # Step 3: Wait for all processing to complete
         if uploaded_files:
             PROCESSING_STATUS[repo_id]["message"] = "Waiting for Neo4j ingestion to complete"
             wait_for_neo4j_processing(repo_id, uploaded_files)
@@ -136,7 +118,6 @@ def process_files_in_batches(repo_id, files_to_process, temp_repo_path):
             PROCESSING_STATUS[repo_id]["status"] = "error"
             PROCESSING_STATUS[repo_id]["message"] = "No files were successfully uploaded"
 
-        # Clean up
         try:
             shutil.rmtree(temp_repo_path, onerror=remove_readonly)
             if repo_id in CLONED_REPOS:
@@ -155,7 +136,6 @@ def process_files_in_batches(repo_id, files_to_process, temp_repo_path):
 def verify_batch_in_neo4j(repo_id, batch_files):
     """Verify if a batch of files has been processed in Neo4j"""
     try:
-        # Get Neo4j connection details
         neo4j_uri = os.getenv("NEO4J_URI", "")
         neo4j_username = os.getenv("NEO4J_USERNAME", "")
         neo4j_password = os.getenv("NEO4J_PASSWORD", "")
@@ -164,10 +144,8 @@ def verify_batch_in_neo4j(repo_id, batch_files):
             print("Neo4j connection details missing, skipping batch verification")
             return
         
-        # Connect to Neo4j
         driver = GraphDatabase.driver(neo4j_uri, auth=(neo4j_username, neo4j_password))
         
-        # Maximum wait time (30 seconds)
         max_wait_time = 30
         start_time = time.time()
         batch_processed = False
@@ -175,17 +153,14 @@ def verify_batch_in_neo4j(repo_id, batch_files):
         file_names = [os.path.basename(file_path) for file_path in batch_files]
         print(f"Verifying batch of {len(batch_files)} files in Neo4j: {file_names}")
         
-        # Poll Neo4j to check if processing is complete for this batch
         while time.time() - start_time < max_wait_time:
             try:
                 with driver.session() as session:
-                    # Check for each specific file in the batch
                     files_found = 0
                     
                     for file_path in batch_files:
                         file_name = os.path.basename(file_path)
                         
-                        # Query to check if the file exists
                         result = session.run(
                             """
                             MATCH (f) 
@@ -209,10 +184,8 @@ def verify_batch_in_neo4j(repo_id, batch_files):
             except Exception as e:
                 print(f"Error verifying batch in Neo4j: {e}")
             
-            # Wait 2 seconds before checking again
             time.sleep(2)
         
-        # Close the driver
         driver.close()
         
         if not batch_processed:
@@ -220,12 +193,10 @@ def verify_batch_in_neo4j(repo_id, batch_files):
     
     except Exception as e:
         print(f"Error in batch verification: {e}")
-        # Continue processing even if verification fails
 
 def wait_for_neo4j_processing(repo_id, uploaded_files):
     """Wait for Neo4j to finish processing all files"""
     try:
-        # Get Neo4j connection details
         neo4j_uri = os.getenv("NEO4J_URI", "")
         neo4j_username = os.getenv("NEO4J_USERNAME", "")
         neo4j_password = os.getenv("NEO4J_PASSWORD", "")
@@ -235,31 +206,25 @@ def wait_for_neo4j_processing(repo_id, uploaded_files):
             PROCESSING_STATUS[repo_id]["message"] = "Neo4j connection details missing"
             return
         
-        # Connect to Neo4j
         driver = GraphDatabase.driver(neo4j_uri, auth=(neo4j_username, neo4j_password))
         
-        # Maximum wait time (5 minutes) - increased for large file sets
         max_wait_time = 300  # seconds (increased from 180 to 300)
         start_time = time.time()
         all_processed = False
         files_found = 0
         
-        # Collect file names for proper matching
         file_names = [os.path.basename(file_path) for file_path in uploaded_files]
         file_paths = uploaded_files
         
         print(f"Final verification for {len(uploaded_files)} files in Neo4j: {file_names}")
         
-        # Track consecutive polls with same file count to detect stalls
         last_files_found = -1
         stall_count = 0
         max_stall_count = 5  # Consider processing stalled after 5 consecutive identical polls
         
-        # Poll Neo4j to check if processing is complete
         while time.time() - start_time < max_wait_time:
             try:
                 with driver.session() as session:
-                    # First, check how many total file nodes exist for this repo
                     repo_check = session.run(
                         """
                         MATCH (f)
@@ -272,12 +237,10 @@ def wait_for_neo4j_processing(repo_id, uploaded_files):
                     total_nodes_in_db = repo_check["total_nodes"] if repo_check else 0
                     print(f"Found {total_nodes_in_db} total nodes for repo_id {repo_id}")
                     
-                    # Next, check for each specific file - using multiple approaches for better matching
                     files_found = 0
                     found_files = []
                     missing_files = []
                     
-                    # Try alternative approach to find file nodes - with more flexible matching
                     alt_check = session.run(
                         """
                         MATCH (f)
@@ -287,10 +250,8 @@ def wait_for_neo4j_processing(repo_id, uploaded_files):
                         {"repo_id": repo_id}
                     ).data()
                     
-                    # Create a lookup dictionary of all possible node identifiers
                     node_lookups = {}
                     for node in alt_check:
-                        # Add all possible identifiers to the lookup
                         if node and "name" in node and node["name"]:
                             node_lookups[node["name"].lower()] = True
                         if node and "path" in node and node["path"]:
@@ -302,12 +263,10 @@ def wait_for_neo4j_processing(repo_id, uploaded_files):
                         if node and "filename" in node and node["filename"]:
                             node_lookups[node["filename"].lower()] = True
                     
-                    # Check each uploaded file against the lookup dictionary
                     for i, file_path in enumerate(uploaded_files):
                         file_name = file_names[i]
                         file_found = False
                         
-                        # Check file in multiple ways
                         if file_name.lower() in node_lookups:
                             file_found = True
                         elif file_path.lower() in node_lookups:
@@ -315,9 +274,7 @@ def wait_for_neo4j_processing(repo_id, uploaded_files):
                         elif file_path.replace('\\', '/').lower() in node_lookups:
                             file_found = True
                         
-                        # Traditional query approach as fallback
                         if not file_found:
-                            # Standard query to check if the file node exists
                             result = session.run(
                                 """
                                 MATCH (f) 
@@ -333,7 +290,6 @@ def wait_for_neo4j_processing(repo_id, uploaded_files):
                             if result and result["node_count"] > 0:
                                 file_found = True
                         
-                        # Record results
                         if file_found:
                             files_found += 1
                             found_files.append(file_name)
@@ -342,10 +298,8 @@ def wait_for_neo4j_processing(repo_id, uploaded_files):
                             missing_files.append(file_name)
                             print(f"File not found in Neo4j yet: {file_name}")
                     
-                    # Update progress
                     PROCESSING_STATUS[repo_id]["message"] = f"Found {files_found}/{len(uploaded_files)} files in Neo4j"
                     
-                    # Check for stalled processing
                     if files_found == last_files_found:
                         stall_count += 1
                     else:
@@ -354,7 +308,6 @@ def wait_for_neo4j_processing(repo_id, uploaded_files):
                     
                     if stall_count >= max_stall_count:
                         print(f"Processing appears stalled at {files_found}/{len(uploaded_files)} files for {stall_count} consecutive checks")
-                        # If we've processed at least 50% of files, consider it partial success
                         if files_found >= len(uploaded_files) * 0.5:
                             print(f"Considering as partial success with {files_found}/{len(uploaded_files)} files")
                             all_processed = True
@@ -365,24 +318,17 @@ def wait_for_neo4j_processing(repo_id, uploaded_files):
                     if missing_files:
                         print(f"Missing files: {missing_files}")
                     
-                    # Consider processing complete in these cases:
-                    # 1. All files are found
-                    # 2. We have more nodes than files (likely some files created multiple nodes)
-                    # 3. We have at least 75% of files and it's been at least 2 minutes
                     time_elapsed = time.time() - start_time
                     percent_found = files_found / len(uploaded_files) if uploaded_files else 0
                     
                     if files_found == len(uploaded_files):
-                        # All files found - complete success
                         all_processed = True
                         break
                     elif total_nodes_in_db >= len(uploaded_files) * 1.5:
-                        # More nodes than files - likely success with multiple nodes per file
                         print(f"Found {total_nodes_in_db} nodes for {len(uploaded_files)} files - considering complete")
                         all_processed = True
                         break
                     elif percent_found >= 0.75 and time_elapsed > 120:
-                        # 75% of files found after 2 minutes - partial success
                         print(f"Found {percent_found*100:.1f}% of files after {time_elapsed:.1f} seconds - considering partial success")
                         all_processed = True
                         break
@@ -391,26 +337,20 @@ def wait_for_neo4j_processing(repo_id, uploaded_files):
                 PROCESSING_STATUS[repo_id]["message"] = f"Error checking Neo4j: {str(e)}"
                 print(f"Error checking Neo4j: {e}")
             
-            # Wait longer between checks (8 seconds)
             time.sleep(8)
         
-        # Close the driver
         driver.close()
         
         if all_processed:
-            # If all files were found, mark as complete
             if files_found == len(uploaded_files):
                 PROCESSING_STATUS[repo_id]["status"] = "complete"
                 PROCESSING_STATUS[repo_id]["message"] = f"Processing complete. All {files_found} files loaded into Neo4j."
             else:
-                # Otherwise, mark as partial success
                 PROCESSING_STATUS[repo_id]["status"] = "partial"
                 PROCESSING_STATUS[repo_id]["message"] = f"Partial processing complete. Found {files_found}/{len(uploaded_files)} files in Neo4j."
                 
-            # Create graph visualization
             try:
                 print("Creating graph visualization")
-                # Connect to Neo4j again for visualization
                 driver = GraphDatabase.driver(neo4j_uri, auth=(neo4j_username, neo4j_password))
                 with driver.session() as session:
                     session.run(
@@ -429,7 +369,6 @@ def wait_for_neo4j_processing(repo_id, uploaded_files):
             except Exception as e:
                 print(f"Error creating graph visualization: {e}")
         else:
-            # If we found any files, still consider it a partial success
             if files_found > 0:
                 PROCESSING_STATUS[repo_id]["status"] = "partial"
                 PROCESSING_STATUS[repo_id]["message"] = f"Partial processing complete. Found {files_found}/{len(uploaded_files)} files in Neo4j."
@@ -471,13 +410,10 @@ def fetch_repo_files():
                 print(f"Warning: Failed to clear Neo4j database. Status code: {response.status_code}")
         except Exception as e:
             print(f"Warning: Error clearing Neo4j database: {e}. Continuing with repository cloning.")
-            # We continue even if clearing fails
         
-        # Create a unique ID for this repo cloning session
         import hashlib
         repo_id = hashlib.sha256(github_url.encode()).hexdigest()
 
-        # Create a temporary directory for cloning
         temp_dir = tempfile.mkdtemp()
         CLONED_REPOS[repo_id] = temp_dir # Store the temp path
 
@@ -568,11 +504,9 @@ def check_processing_status():
     
     status = PROCESSING_STATUS[repo_id]
     
-    # Check if processing is complete or partial success
     is_complete = status.get("status") == "complete"
     is_partial = status.get("status") == "partial"
     
-    # Return a success response for both complete and partial success
     if is_complete or is_partial:
         response = {
             "success": True,
@@ -583,7 +517,6 @@ def check_processing_status():
             "total_files": status.get("total_files", 0)
         }
         
-        # Add information about partial processing if relevant
         if is_partial:
             response["partial_success"] = True
             response["warning"] = "Some files could not be processed. You can still proceed to the chat interface."
@@ -592,7 +525,6 @@ def check_processing_status():
                 
         return jsonify(response)
     
-    # Otherwise, return the current status
     return jsonify({
         "success": True,
         "status": status.get("status", "unknown"),
@@ -616,7 +548,6 @@ def get_file_content():
                 'message': 'Missing repo_id or file_path parameter'
             }), 400
             
-        # Check if repository exists in our cloned repos
         if repo_id not in CLONED_REPOS:
             return jsonify({
                 'success': False,

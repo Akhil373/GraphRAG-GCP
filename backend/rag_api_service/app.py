@@ -14,31 +14,23 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# --- Flask App Initialization ---
 app = Flask(__name__)
-CORS(app) # Enable CORS for all routes
+CORS(app)
 
-# --- Logging Configuration ---
-# Set up a basic logger for the Flask app
-# In a production environment, you'd configure this more robustly
-# (e.g., to write to files, send to a log aggregation service)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s')
 app.logger.info("Flask app starting up...")
 
-# --- Environment Variable Validation and Global Initializations ---
 GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID")
 GCP_REGION = os.getenv("GCP_REGION")
 NEO4J_URI = os.getenv("NEO4J_URI")
 NEO4J_USERNAME = os.getenv("NEO4J_USERNAME")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
 
-# Log Neo4j connection info (mask password)
 app.logger.info(f"Neo4j URI: {NEO4J_URI}, Username: {NEO4J_USERNAME}")
 
-# Validate environment variables critical for startup
 if not GCP_PROJECT_ID:
     app.logger.critical("GCP_PROJECT_ID environment variable not set. Exiting.")
-    exit(1) # Exit if critical config is missing
+    exit(1)
 if not GCP_REGION:
     app.logger.critical("GCP_REGION environment variable not set. Exiting.")
     exit(1)
@@ -52,36 +44,29 @@ if not NEO4J_PASSWORD:
     app.logger.critical("NEO4J_PASSWORD environment variable not set. Exiting.")
     exit(1)
 
-# Initialize Vertex AI
 try:
     vertexai.init(project=GCP_PROJECT_ID, location="us-central1")
     embedding_model = TextEmbeddingModel.from_pretrained("text-embedding-large-exp-03-07")
-    generative_model = GenerativeModel("gemini-2.5-flash")
+    generative_model = GenerativeModel("gemini-2.5-pro")
     app.logger.info(f"Vertex AI initialized for project '{GCP_PROJECT_ID}' in region '{GCP_REGION}'.")
 except GoogleAPIError as e:
     app.logger.critical(f"Failed to initialize Vertex AI or load models: {e}", exc_info=True)
-    exit(1) # Exit if Vertex AI initialization fails (critical dependency)
+    exit(1)
 except Exception as e:
     app.logger.critical(f"An unexpected error occurred during Vertex AI initialization: {e}", exc_info=True)
     exit(1)
 
-# Neo4j connection - Initialized once globally
 neo4j_driver = None
 
 def get_neo4j_driver():
-    """
-    Returns a singleton Neo4j driver instance.
-    Establishes a plain connection using the provided URI and credentials.
-    """
     global neo4j_driver
     if neo4j_driver is None:
         try:
             neo4j_driver = GraphDatabase.driver(
                 NEO4J_URI, auth=(NEO4J_USERNAME, NEO4J_PASSWORD)
             )
-            neo4j_driver.verify_connectivity() # Test the connection
+            neo4j_driver.verify_connectivity()
             app.logger.info("Neo4j driver initialized and connected successfully.")
-            # Ensure GDS vector indexes exist
             create_vector_indexes(neo4j_driver)
         except ServiceUnavailable as e:
             app.logger.critical(
@@ -96,19 +81,8 @@ def get_neo4j_driver():
     return neo4j_driver
 
 def create_vector_indexes(driver):
-    """
-    Ensure that the required GDS vector indexes exist **and** are configured with
-    the correct dimensionality for the current embedding model. If an index
-    already exists but its configured `vector.dimensions` does not match the
-    expected size (3072), the index will be dropped and recreated with the
-    correct settings. This prevents runtime errors such as:
-        "Index query vector has 3072 dimensions, but indexed vectors have 768."
-    """
-
-    # Desired dimensionality based on the active embedding model
     desired_dim = 3072
 
-    # Cypher templates to (re)create the indexes
     index_creation_queries = {
         "file_index": f"""
             CREATE VECTOR INDEX `file_index` IF NOT EXISTS
@@ -144,12 +118,9 @@ def create_vector_indexes(driver):
 
     try:
         with driver.session() as session:
-            # First, try to drop existing indexes to ensure clean recreation
             try:
-                # Use SHOW INDEXES command which is supported in AuraDB
                 existing_indexes = session.run("SHOW INDEXES WHERE name in ['file_index', 'function_index', 'operation_index']").data()
                 
-                # Drop existing indexes if they exist
                 for index in existing_indexes:
                     index_name = index.get('name')
                     if index_name:
@@ -158,7 +129,6 @@ def create_vector_indexes(driver):
             except Exception as e:
                 app.logger.warning(f"Could not check or drop existing indexes: {e}")
                 
-            # Create new indexes with the correct dimensions
             for index_name, create_query in index_creation_queries.items():
                 app.logger.info(f"Creating vector index '{index_name}' with dimension {desired_dim}...")
                 session.run(create_query)
@@ -173,7 +143,6 @@ def create_vector_indexes(driver):
     except Exception as e:
         app.logger.error("An unexpected error occurred during index creation: %s", e, exc_info=True)
 
-# --- Global Error Handlers ---
 @app.errorhandler(400)
 def handle_bad_request(e):
     app.logger.error(f"Bad Request (400): {e.description}", exc_info=True)
@@ -212,7 +181,6 @@ def handle_google_api_error(e):
 
 @app.errorhandler(Exception)
 def handle_generic_error(e):
-    # This is a catch-all for any unhandled exceptions
     app.logger.error(f"An unhandled internal server error occurred: {e}", exc_info=True)
     return jsonify({
         "status": 500,
@@ -221,7 +189,6 @@ def handle_generic_error(e):
     }), 500
 
 
-# --- Helper Functions ---
 def generate_embeddings(text):
     """Generates embeddings for a given text using Vertex AI."""
     if not text:
@@ -232,7 +199,7 @@ def generate_embeddings(text):
         return embeddings[0].values
     except Exception as e:
         app.logger.error(f"Vertex AI embedding model error: {e}", exc_info=True)
-        raise # Re-raise to be caught by the higher-level error handler
+        raise
 
 def retrieve_graph_context(query_embedding, user_query, session):
     """
@@ -879,16 +846,13 @@ def chat_with_graph():
         })
 
     except ConnectionError:
-        # This will be caught by the @app.errorhandler(ConnectionError)
         app.logger.error("Chat API failed due to database connection issue.", exc_info=True)
         raise
     except GoogleAPIError:
-        # This will be caught by the @app.errorhandler(GoogleAPIError)
         app.logger.error("Chat API failed due to Google API issue.", exc_info=True)
         raise
     except Exception as e:
         app.logger.error(f"An unexpected error occurred in /api/chat: {e}", exc_info=True)
-        # This will be caught by the @app.errorhandler(Exception)
         raise
 
 @app.route('/healthz', methods=['GET'])
@@ -963,7 +927,6 @@ def clear_database():
             "message": f"Unexpected error: {str(e)}"
         }), 500
 
-# --- Neo4j Graph API Routes ---
 @app.route('/api/graph/files', methods=['GET'])
 @app.route('/graph/files', methods=['GET'])
 def get_files():
