@@ -6,6 +6,7 @@ import ChatPanel from './ChatPanel';
 import GraphControls from './GraphControls';
 import GraphView from './GraphView';
 import './Neo4jChatInterface.css';
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 
 // Updated to match the backend API from app.py
 const RAG_API_URL = 'http://localhost:5001/api/chat';
@@ -37,7 +38,7 @@ function Neo4jChatInterface({ repoId }) {
       duration: 10000,
       native: true
     });
-  }
+  };
   
   // Fetch files when component mounts
   useEffect(() => {
@@ -434,41 +435,51 @@ function Neo4jChatInterface({ repoId }) {
 
   return (
     <div className="neo4j-chat-interface">
-      <div className="file-list-column">
-        <FileList 
-          files={files} 
-          selectedFile={selectedFile}
-          onFileSelect={handleFileSelect}
-          isLoading={isFilesLoading}
-        />
-      </div>
-      
-      <div className="chat-panel-column">
-        <ChatPanel
-          chatHistory={chatHistory}
-          chatQuery={chatQuery}
-          setChatQuery={setChatQuery}
-          handleChatQuerySubmit={handleChatQuerySubmit}
-          isChatLoading={isChatLoading}
-          selectedFile={selectedFile}
-          isFileDataLoading={isFileDataLoading}
-        />
-      </div>
-      
-      <div className="graph-controls-column">
-        <GraphControls
-          filters={graphFilters}
-          onFilterChange={handleGraphFilterChange}
-        />
-      </div>
-      
-      <div className="graph-view-column">
-        <GraphView 
-          graphData={filteredGraphData}
-          selectedFile={selectedFile}
-          isLoading={isGraphLoading}
-        />
-      </div>
+      <PanelGroup direction="horizontal">
+        <Panel defaultSize={20} minSize={15}>
+          <div className="file-list-column">
+            <FileList
+              files={files}
+              selectedFile={selectedFile}
+              onFileSelect={handleFileSelect}
+              isLoading={isFilesLoading}
+            />
+          </div>
+        </Panel>
+        <PanelResizeHandle />
+        <Panel minSize={30}>
+          <div className="chat-panel-column">
+            <ChatPanel
+              chatHistory={chatHistory}
+              chatQuery={chatQuery}
+              setChatQuery={setChatQuery}
+              handleChatQuerySubmit={handleChatQuerySubmit}
+              isChatLoading={isChatLoading}
+              selectedFile={selectedFile}
+              isFileDataLoading={isFileDataLoading}
+            />
+          </div>
+        </Panel>
+        <PanelResizeHandle />
+        <Panel defaultSize={20} minSize={15}>
+          <div className="graph-controls-column">
+            <GraphControls
+              filters={graphFilters}
+              onFilterChange={handleGraphFilterChange}
+            />
+          </div>
+        </Panel>
+        <PanelResizeHandle />
+        <Panel defaultSize={25} minSize={20}>
+          <div className="graph-view-column">
+            <GraphView
+              graphData={filteredGraphData}
+              selectedFile={selectedFile}
+              isLoading={isGraphLoading}
+            />
+          </div>
+        </Panel>
+      </PanelGroup>
     </div>
   );
 }

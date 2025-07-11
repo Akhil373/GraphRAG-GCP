@@ -1,26 +1,50 @@
 /* Neo4jChatInterface.css */
 
-/* Main container layout - four column design */
+/* Main container layout */
 .neo4j-chat-interface {
-  display: grid;
-  grid-template-columns: 250px 1fr 250px 350px;
-  grid-template-areas: "file-list chat-panel graph-controls graph-view";
-  gap: 1rem;
+  display: flex;
+  flex-direction: column;
   height: calc(100vh - 100px);
   max-width: 100%;
   margin: 0 auto;
   overflow: hidden; /* Prevent overall scrolling */
 }
 
+[data-panel-group] {
+  height: 100%;
+}
+
+[data-panel-resize-handle-id] {
+  width: 1rem;
+  background-color: transparent;
+  position: relative;
+}
+
+[data-panel-resize-handle-id]:after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  height: 30px;
+  width: 2px;
+  background-color: var(--border-light);
+  border-radius: 2px;
+}
+
+.dark-theme [data-panel-resize-handle-id]:after {
+  background-color: var(--border-dark);
+}
+
 /* Column 1: File List */
 .file-list-column {
-  grid-area: file-list;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
   min-height: 0; /* Allow column to shrink */
+  height: 100%;
 }
 
 .light-theme .file-list-column {
@@ -265,13 +289,13 @@
 
 /* Column 2: Chat Panel */
 .chat-panel-column {
-  grid-area: chat-panel;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
-  min-height: 0; /* Allow column to shrink */
+  min-height: 0;
+  height: 100%;
 }
 
 .light-theme .chat-panel-column {
@@ -508,13 +532,13 @@
 
 /* Column 3: Graph Controls */
 .graph-controls-column {
-  grid-area: graph-controls;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
-  min-height: 0; /* Allow column to shrink */
+  min-height: 0;
+  height: 100%;
 }
 
 .light-theme .graph-controls-column {
@@ -843,13 +867,13 @@
 
 /* Column 4: Graph View */
 .graph-view-column {
-  grid-area: graph-view;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
-  min-height: 0; /* Allow column to shrink */
+  min-height: 0;
+  height: 100%;
 }
 
 .light-theme .graph-view-column {

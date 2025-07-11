@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { docco } from 'react-syntax-highlighter/dist/cjs/styles/hljs';
+import { docco } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import SyntaxHighlighter from 'react-syntax-highlighter';
