@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import addNotification from 'react-push-notification';
 import FileList from './FileList';
 import ChatPanel from './ChatPanel';
 import GraphControls from './GraphControls';
@@ -27,11 +28,22 @@ function Neo4jChatInterface({ repoId }) {
     showAllNodeTypes: true,
     showAllRelationshipTypes: true,
   });
+
+
+  const entryNotification = () => {
+    addNotification({
+      title: 'Completed processing files',
+      message: 'Your files have been processed. You can now analyze your code.',
+      duration: 10000,
+      native: true
+    });
+  }
   
   // Fetch files when component mounts
   useEffect(() => {
     if (repoId) {
       fetchFiles();
+      entryNotification();
     }
 
     // Also set up a listener for CORS/network errors

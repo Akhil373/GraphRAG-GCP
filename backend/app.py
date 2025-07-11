@@ -11,29 +11,17 @@ from google.cloud import storage
 from git import Repo, GitCommandError # Using GitPython
 import stat # Keep this for Windows cleanup
 from neo4j import GraphDatabase
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app) # Enable CORS for all routes
 
 # Initialize Google Cloud Storage client
 storage_client = storage.Client()
-GCS_BUCKET_NAME = os.getenv('GCS_BUCKET_NAME', 'your-legacy-code-bucket') # Set this env var or use a default
+GCS_BUCKET_NAME = os.getenv('GCS_BUCKET_NAME')
 
-# REMOVE THESE LINES:
-# import vertexai
-# from vertexai.language_models import TextEmbeddingModel
-# from vertexai.generative_models import GenerativeModel
-# vertexai.init(
-#     project=os.environ.get("GCP_PROJECT_ID"),
-#     location=os.environ.get("GCP_REGION")
-# )
-# embedding_model = TextEmbeddingModel.from_pretrained("text-embedding-004")
-# generative_model = GenerativeModel("gemini-1.5-flash-001")
-
-
-# In-memory store to map cloned repos to temp paths (for multi-step process)
-# In a real app, this should be persisted (e.g., in a database or Redis)
-# For hackathon, we'll use a simple dict keyed by repo_id (e.g., original GitHub URL hash)
 CLONED_REPOS = {}
 
 # Dict to track processing progress
@@ -672,7 +660,7 @@ def get_file_content():
 if __name__ == '__main__':
     # Ensure a default GCS bucket name for local testing if not set in env
     if not os.getenv('GCS_BUCKET_NAME'):
-        os.environ['GCS_BUCKET_NAME'] = 'my-legacy-code-bucket' # CHANGE THIS TO YOUR ACTUAL BUCKET NAME
+        os.getenv('GCS_BUCKET_NAME')
 
     # For local testing, ensure your gcloud application-default login is done
     # gcloud auth application-default login

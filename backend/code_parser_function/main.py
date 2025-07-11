@@ -87,96 +87,47 @@ class CodeParser:
             if score >= 2:
                 return language
         return 'unknown'
-        
-    def extract_code_operations(self, content: str, language: str) -> List[Dict[str, str]]:
-        """Identify different coding operations/examples within a single file."""
-        operations = []
-        
-        # Look for numbered operations or challenges
-        numbered_operations = re.findall(r'(?:\/\/|\/\*|\#|--)\s*(\d+)\.\s*(.*?)(?:\n|$)', content)
-        for num, desc in numbered_operations:
-            operations.append({
-                'operation_number': num,
-                'description': desc.strip(),
-                'type': 'challenge'
-            })
-        
-        # Look for titled sections (especially in example/challenge files)
-        section_patterns = [
-            # Match header comments that indicate a new problem or solution
-            r'(?:\/\/|\/\*|\#|--)\s*(?:-+)?\s*(?:Problem|Exercise|Challenge|Solution|Example)\s*(?:\d+)?:\s*([^\n]*)',
-            # Match function headers with descriptive comments above
-            r'(?:\/\/|\/\*|\#|--)\s*([^\n]*?)(?:\n|\r\n?)(?:\/\/|\/\*|\#|--)[^\n]*\n(?:.*?)(?:function|def|void|int|float|double|char)\s+(\w+)'
-        ]
-        
-        for pattern in section_patterns:
-            matches = re.finditer(pattern, content, re.MULTILINE | re.DOTALL)
-            for match in matches:
-                if len(match.groups()) > 0:
-                    desc = match.group(1).strip()
-                    # Skip if too short or contains just dashes/characters
-                    if len(desc) > 5 and not re.match(r'^[^a-zA-Z0-9]*$', desc):
-                        func_name = match.group(2) if len(match.groups()) > 1 else None
-                        
-                        # Calculate approximate start position for the code snippet
-                        start_pos = match.start()
-                        # Find the next similar pattern or end of file
-                        next_match = re.search(pattern, content[start_pos + 1:], re.MULTILINE | re.DOTALL)
-                        end_pos = start_pos + 1 + next_match.start() if next_match else len(content)
-                        
-                        # Extract code snippet between patterns
-                        code_snippet = content[start_pos:end_pos].strip()
-                        
-                        operations.append({
-                            'description': desc,
-                            'function_name': func_name,
-                            'code_snippet': code_snippet,
-                            'type': 'section'
-                        })
-                        
-        # For C/C++ files, detect main() functions as separate operations
-        if language in ['c', 'cpp']:
-            main_funcs = re.finditer(r'(?:int|void)\s+main\s*\([^\)]*\)\s*\{', content)
-            for match in main_funcs:
-                # Find start of the main function
-                start_pos = match.start()
-                # Find the end of the function using bracket matching
-                end_pos = start_pos
-                bracket_count = 0
-                found_opening = False
+
+    def get_full_function_body(self, content_lines: List[str], start_line: int) -> str:
+        """
+        Extracts the full body of a function starting from a specific line,
+        by counting curly braces with improved handling.
+        """
+        if start_line >= len(content_lines):
+            return ""
+
+        function_body = []
+        brace_count = 0
+        in_function = False
+        found_first_brace = False
+
+        # Start from the line where the function is declared
+        for i in range(start_line, len(content_lines)):
+            line = content_lines[i]
+            
+            # Track both opening and closing braces
+            open_braces = line.count('{')
+            close_braces = line.count('}')
+            
+            if not in_function and open_braces > 0:
+                in_function = True
+                found_first_brace = True
+                brace_count += open_braces - close_braces
+                function_body.append(line)
+                if brace_count <= 0:  # Handle single-line functions
+                    break
+                continue
+                    
+            if in_function:
+                function_body.append(line)
+                brace_count += open_braces
+                brace_count -= close_braces
                 
-                for i in range(start_pos, len(content)):
-                    if content[i] == '{':
-                        bracket_count += 1
-                        found_opening = True
-                    elif content[i] == '}':
-                        bracket_count -= 1
-                        
-                    if found_opening and bracket_count == 0:
-                        end_pos = i + 1
-                        break
+                # End of function detected
+                if brace_count <= 0:
+                    break
                 
-                # Get surrounding comments for context
-                context_start = max(0, start_pos - 300)  # Look back 300 chars for comments
-                comment_block = content[context_start:start_pos]
-                comment_match = re.search(r'(?:\/\/|\/\*)(.*?)(?:\*\/|\n)', comment_block, re.DOTALL)
-                
-                description = "Main function implementation"
-                if comment_match:
-                    comment_text = comment_match.group(1).strip()
-                    if len(comment_text) > 5:  # Only use meaningful comments
-                        description = comment_text
-                
-                code_snippet = content[start_pos:end_pos]
-                
-                operations.append({
-                    'description': description,
-                    'function_name': 'main',
-                    'code_snippet': code_snippet,
-                    'type': 'main_function'
-                })
-        
-        return operations
+        return '\n'.join(function_body)
 
     def parse_content(self, file_path: str, content: str) -> Tuple[List[CodeEntity], List[CodeRelationship], str]:
         """Parse the content of a single file."""
@@ -187,44 +138,6 @@ class CodeParser:
         context_sample = content[:2000]
         
         ai_entities, ai_relationships = self.extract_with_ai(content, language, file_path)
-        
-        # Extract operations/examples from the content
-        operations = self.extract_code_operations(content, language)
-        
-        # If operations found, add them as special entities
-        if operations:
-            logger.info(f"Found {len(operations)} distinct operations/examples in {file_path}")
-            
-            for i, op in enumerate(operations):
-                # Create a unique name for the operation
-                op_name = f"operation_{i+1}"
-                if op.get('function_name'):
-                    op_name = op.get('function_name') or f"operation_{i+1}"
-                elif op.get('operation_number'):
-                    op_name = f"operation_{op.get('operation_number')}"
-                
-                # Create an entity for this operation
-                entity = CodeEntity(
-                    name=op_name,
-                    entity_type="Operation",  # Special entity type for operations
-                    file_path=file_path,
-                    description=op.get('description', 'Code operation example'),
-                    properties={
-                        "code_snippet": op.get('code_snippet', ''),
-                        "operation_type": op.get('type', 'operation'),
-                        "source_file": os.path.basename(file_path)
-                    }
-                )
-                ai_entities.append(entity)
-                
-                # Create a relationship between the file and this operation
-                relationship = CodeRelationship(
-                    source=os.path.basename(file_path),
-                    target=op_name,
-                    relationship_type="contains_operation",
-                    context=f"File {os.path.basename(file_path)} contains operation: {op.get('description', '')}"
-                )
-                ai_relationships.append(relationship)
         
         if not ai_entities:
             logger.info(f"AI returned no entities for {file_path}, falling back to regex.")
@@ -342,6 +255,8 @@ class CodeParser:
                 parsed_data = json.loads(json_text)
                 
                 entities = []
+                content_lines = content.split('\n')
+
                 for entity_data in parsed_data.get('entities', []):
                     # Extract all fields including any additional properties
                     properties = entity_data.get('properties', {})
@@ -351,16 +266,21 @@ class CodeParser:
                         if key not in ['name', 'entity_type', 'description', 'properties'] and value is not None:
                             properties[key] = value
                     
-                    # Extract code sample from the original content
-                    line_number = properties.get('line_number', 0)
-                    code_length = properties.get('code_length', 20)
-                    if line_number > 0:
-                        lines = content.split('\n')
+                    # For functions, get the full function body
+                    if entity_data.get('entity_type') == 'Function' and properties.get('line_number'):
+                        line_number = properties.get('line_number', 1) - 1 # Adjust for 0-based index
+                        function_code = self.get_full_function_body(content_lines, line_number)
+                        if function_code:
+                            properties['context_sample'] = function_code
+
+                    # Fallback for non-functions or if line number is missing
+                    elif properties.get('line_number'):
+                        line_number = properties.get('line_number', 1)
+                        code_length = properties.get('code_length', 10)
                         start_line = max(0, line_number - 3)
-                        end_line = min(len(lines), line_number + code_length + 3)
-                        code_sample = '\n'.join(lines[start_line:end_line])
-                        properties['context_sample'] = code_sample
-                    
+                        end_line = min(len(content_lines), line_number + code_length + 3)
+                        properties['context_sample'] = '\n'.join(content_lines[start_line:end_line])
+
                     entities.append(CodeEntity(
                         name=entity_data.get('name'),
                         entity_type=entity_data.get('entity_type'),
@@ -379,15 +299,20 @@ class CodeParser:
                     ))
                 
                 return entities, relationships
+        
         except Exception as e:
-            logger.error(f"AI extraction failed for {file_path}: {e}")
-            logger.error(f"Error details: {type(e).__name__}: {str(e)}")
-        return [], []
+            logger.error(f"Failed to parse with AI for {file_path}: {e}", exc_info=True)
+            return [], []
 
     def extract_with_regex(self, content: str, language: str, file_path: str) -> Tuple[List[CodeEntity], List[CodeRelationship]]:
-        """Enhanced fallback regex-based extraction with more patterns and relationship detection."""
+        """Enhanced fallback regex-based extraction with full function body capture"""
         entities = []
         relationships = []
+        # Split content into lines for potential function body extraction
+        content_lines = content.split('\n')
+        
+        # Define languages that use braces for function bodies
+        brace_languages = {'c', 'cpp', 'java', 'javascript', 'typescript', 'csharp', 'php', 'go', 'ruby', 'rpg', 'flink', 'fortran', 'pli', 'assembly'}
         
         # Enhanced patterns dictionary with more languages and entity types
         patterns = {
@@ -399,17 +324,17 @@ class CodeParser:
                 'business_rule': r'^\s*IF\s+(.+?)\s+THEN'
             },
             'c': {
-                'function': r'(?:^|\s)(?:static\s+)?(?:void|int|char|float|double|long|size_t|struct\s+\w+|\w+_t)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\([^;]*\)\s*\{',
-                'variable': r'(?:^|\s)(?:static\s+)?(?:int|char|float|double|long|size_t|\w+_t)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*(?:=|;|\[)',
+                'function': r'(?:^|\s)(?:static\s+)?(?:const\s+)?(?:void|int|char|float|double|long|size_t|struct\s+\w+|\w+_t)\s*\**\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\([^;]*\)\s*\{',
+                'variable': r'(?:^|\s)(?:static\s+)?(?:const\s+)?(?:void|int|char|float|double|long|size_t|struct\s+\w+|\w+_t)\s*\**\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*(?:=|;|\[)',
                 'struct': r'struct\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\{',
                 'include': r'#include\s*[<"]([^>"]+)[>"]',
                 'define': r'#define\s+([a-zA-Z_][a-zA-Z0-9_]*)'
             },
             'cpp': {
-                'function': r'(?:^|\s)(?:static\s+)?(?:void|int|char|float|double|long|size_t|bool|auto|std::\w+|struct\s+\w+|\w+::\w+|\w+_t)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\([^;]*\)\s*(?:const\s*)?\{',
-                'method': r'(?:^|\s)(?:virtual\s+)?(?:void|int|char|float|double|long|size_t|bool|auto|std::\w+|\w+::\w+|\w+_t)\s+([a-zA-Z_][a-zA-Z0-9_<>]*)::\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\([^;]*\)\s*(?:const\s*)?\{',
+                'function': r'(?:^|\s)(?:static\s+)?(?:const\s+)?(?:void|int|char|float|double|long|size_t|bool|auto|std::\w+|struct\s+\w+|\w+::\w+|\w+_t)\s*\**\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\([^;]*\)\s*(?:const\s*)?\{',
+                'method': r'(?:^|\s)(?:virtual\s+)?(?:const\s+)?(?:void|int|char|float|double|long|size_t|bool|auto|std::\w+|\w+::\w+|\w+_t)\s*\**\s*([a-zA-Z_][a-zA-Z0-9_<>]*)::\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\([^;]*\)\s*(?:const\s*)?\{',
                 'class': r'class\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*(?::|final|\{)',
-                'variable': r'(?:^|\s)(?:static\s+)?(?:int|char|float|double|long|size_t|bool|auto|std::\w+|\w+::\w+|\w+_t)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*(?:=|;|\[)',
+                'variable': r'(?:^|\s)(?:static\s+)?(?:const\s+)?(?:void|int|char|float|double|long|size_t|bool|auto|std::\w+|struct\s+\w+|\w+::\w+|\w+_t)\s*\**\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*(?:=|;|\[)',
                 'struct': r'struct\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\{',
                 'include': r'#include\s*[<"]([^>"]+)[>"]',
                 'define': r'#define\s+([a-zA-Z_][a-zA-Z0-9_]*)'
@@ -554,6 +479,47 @@ class CodeParser:
                 )
                 entities.append(entity)
                 
+                # Capture full function body for supported languages
+                if entity_type in ['function', 'method']:
+                    if language in ['c', 'cpp', 'java', 'csharp', 'javascript', 'typescript', 'php']:
+                        # Use brace counting for C-like languages
+                        try:
+                            full_body = self.get_full_function_body(content_lines, line_start-1)
+                            if full_body:
+                                entity.properties['context_sample'] = full_body
+                        except Exception as e:
+                            logger.error(f"Full body extraction failed: {e}")
+                    elif language == 'python':
+                        # Handle Python indentation-based functions
+                        try:
+                            function_body = []
+                            current_line = line_start
+                            indent_level = None
+                            
+                            # Find starting indentation
+                            while current_line < len(content_lines):
+                                line = content_lines[current_line-1]
+                                if not line.strip():  # Skip empty lines
+                                    current_line += 1
+                                    continue
+                                    
+                                if indent_level is None:
+                                    indent_level = len(line) - len(line.lstrip())
+                                
+                                # Check for end of function
+                                next_line = content_lines[current_line] if current_line < len(content_lines) else ""
+                                next_indent = len(next_line) - len(next_line.lstrip())
+                                
+                                if next_indent <= indent_level and not next_line.strip().startswith(('def ', 'class ')):
+                                    break
+                                    
+                                function_body.append(line)
+                                current_line += 1
+                                
+                            entity.properties['context_sample'] = '\n'.join(function_body)
+                        except:
+                            pass  # Fallback to original context_sample
+
                 # Add relationship to file
                 relationships.append(CodeRelationship(
                     source=filename,

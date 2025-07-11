@@ -55,6 +55,22 @@ function App() {
   const RAG_API_URL = 'http://localhost:5001/api/chat';
   const CLEAR_DB_URL = 'http://localhost:5001/api/clear-database';
 
+  // State for expanded folders in the file browser
+  const [expandedFolders, setExpandedFolders] = useState(new Set());
+
+  // Add this function to toggle folder expansion
+  const toggleFolder = (folderPath) => {
+    setExpandedFolders(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(folderPath)) {
+        newSet.delete(folderPath);
+      } else {
+        newSet.add(folderPath);
+      }
+      return newSet;
+    });
+  };
+
   // Scroll to bottom whenever chat history changes
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -432,7 +448,7 @@ function App() {
   };
 
   // Helper function to render folder structure recursively
-  const renderFolderTree = (structure, path = "", indent = 0) => {
+  const renderFolderTree = (structure, expandedFolders, toggleFolder, path = "", indent = 0) => {
     return Object.entries(structure).map(([key, value]) => {
       if (typeof value === 'string') {
         // It's a file
@@ -472,46 +488,21 @@ function App() {
         const filePaths = [];
         getFilePaths(value, filePaths);
         
-        // Is folder expanded (default to true)
-        const [isExpanded, setIsExpanded] = useState(true);
-        
-        // Toggle folder expansion
-        const toggleFolder = (e) => {
-          e.stopPropagation();
-          setIsExpanded(!isExpanded);
-        };
-        
-        // Handle folder selection (select/deselect all files in folder)
-        const handleFolderSelect = () => {
-          const newSelectedFiles = new Set(selectedFiles);
-          
-          // Check if all files in the folder are already selected
-          const allSelected = filePaths.every(file => selectedFiles.has(file));
-          
-          if (allSelected) {
-            // Deselect all files in the folder
-            filePaths.forEach(file => {
-              newSelectedFiles.delete(file);
-            });
-          } else {
-            // Select all files in the folder
-            filePaths.forEach(file => {
-              newSelectedFiles.add(file);
-            });
-          }
-          
-          setSelectedFiles(newSelectedFiles);
-        };
+        // Determine if folder is expanded
+        const isExpanded = expandedFolders.has(currentPath);
         
         return (
           <li key={currentPath} className="folder-item">
             <div 
               className={`folder-header ${isExpanded ? 'expanded' : ''}`}
-              onClick={handleFolderSelect}
+              onClick={() => toggleFolder(currentPath)}
             >
               <button 
                 className={`folder-toggle ${isExpanded ? 'expanded' : ''}`}
-                onClick={toggleFolder}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleFolder(currentPath);
+                }}
                 aria-label={isExpanded ? 'Collapse folder' : 'Expand folder'}
                 aria-expanded={isExpanded}
               >
@@ -528,7 +519,7 @@ function App() {
             
             {isExpanded && (
               <ul className="nested-folder">
-                {renderFolderTree(value, currentPath, indent + 1)}
+                {renderFolderTree(value, expandedFolders, toggleFolder, currentPath, indent + 1)}
               </ul>
             )}
           </li>
@@ -696,7 +687,7 @@ function App() {
               {filteredFiles.length > 0 ? (
                 <ul className="file-list">
                   {Object.keys(folderStructure).length > 0 ? (
-                    renderFolderTree(folderStructure)
+                    renderFolderTree(folderStructure, expandedFolders, toggleFolder)
                   ) : (
                     // Fallback to old file list if structure is empty
                     filteredFiles.map((file, index) => (
