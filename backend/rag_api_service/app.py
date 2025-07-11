@@ -9,7 +9,7 @@ import vertexai
 from vertexai.language_models import TextEmbeddingModel
 from vertexai.generative_models import GenerativeModel
 from google.api_core.exceptions import GoogleAPIError
-import re # Added for regex pattern matching
+import re
 from dotenv import load_dotenv
 
 load_dotenv()
