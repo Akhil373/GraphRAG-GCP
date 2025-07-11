@@ -23,6 +23,156 @@ The system is composed of a frontend application, a backend service for reposito
 *   **Graph Visualization:** Provides an interactive 2D force-directed graph of the selected file's components and their relationships.
 *   **Contextual Analysis:** Users can chat about the entire repository or focus on a specific file.
 
+## Setup Instuctions
+
+### Prerequisites
+
+*   **Python:** Python 3.13.
+*   **Node.js and npm:** Required for the frontend application.
+*   **Pip:** Ensure you have an up-to-date version of pip. If you encounter issues, upgrade it using `python -m pip install --upgrade pip`.
+*   **Google Cloud SDK:** The `gcloud` command-line tool is required for authentication.
+*   **Google Cloud Platform (GCP) Account:** Access to GCP is needed for serverless functions, storage, and AI services.
+*   **Neo4j Account:** A Neo4j instance is required for the knowledge graph database.
+
+### 1. Google Cloud Platform (GCP) Setup
+
+1.  **Install and Configure gcloud CLI:**
+    *   Install the [Google Cloud SDK](https://cloud.google.com/sdk/docs/install), which includes the `gcloud` command-line tool.
+    *   Initialize the `gcloud` CLI and log in to your Google account:
+        ```bash
+        gcloud init
+        ```
+    *   Set up Application Default Credentials (ADC) for your local environment. This allows your local backend services to authenticate to Google Cloud APIs using your user credentials.
+        ```bash
+        gcloud auth application-default login
+        ```
+
+2.  **Create a Service Account:**
+    *   In the GCP Console, create a new service account. This service account will be used by the deployed Cloud Functions, not your local machine.
+    *   Assign the following roles to the service account:
+        *   `Cloud Functions Invoker`
+        *   `Storage Admin`
+        *   `Storage Object Admin`
+        *   `Vertex AI User`
+
+3.  **Create GCS Buckets:**
+    *   Create two Google Cloud Storage buckets:
+        1.  A bucket for uploading the cloned repository files.
+        2.  A bucket to store the parsed JSON output from the code parser function.
+
+4.  **Deploy Cloud Functions:**
+    *   Deploy the `code_parser_function` and `graph_ingestor_function` located in the `backend/` directory to Google Cloud Functions.
+    *   When deploying, configure the functions to run using the service account you created in the previous step.
+    *   Set up the appropriate triggers linked to your GCS buckets. Use the following commands
+    * First cd into code parser function dir: `cd backend\code_parser_function` &&
+      ```
+       gcloud functions deploy code_parser_function \
+		  --runtime python311 \
+		  --entry-point DUMMY_ENTRY_POINT \
+		  --trigger-resource=DUMMY_TRIGGER_RESOURCE \
+		  --trigger-event=google.storage.object.finalize \
+		  --service-account=DUMMY_SA@DUMMY_PROJECT.iam.gserviceaccount.com \
+		  --region DUMMY_REGION \
+		  --set-env-vars GCP_PROJECT_ID=DUMMY_PROJECT_ID \
+		  --set-env-vars GCP_REGION=DUMMY_REGION \
+		  --set-env-vars PARSED_DATA_BUCKET=DUMMY_PARSED_DATA_BUCKET \
+		  --no-gen2 \
+		  --memory 1024MB
+		```
+    * Then cd into graph ingestor function: `cd backend\graph_ingestor_function` && 
+      ```
+	   gcloud functions deploy graph_ingestor_function \
+        --runtime python311 \
+        --entry-point DUMMY_ENTRY_POINT \
+        --trigger-resource DUMMY_TRIGGER_RESOURCE \
+        --trigger-event=google.storage.object.finalize \
+        --service-account DUMMY_SA@DUMMY_PROJECT.iam.gserviceaccount.com \
+        --region DUMMY_REGION \
+        --set-env-vars GCP_PROJECT_ID=DUMMY_PROJECT_ID \
+        --set-env-vars GCP_REGION=DUMMY_REGION \
+        --set-env-vars NEO4J_URI=DUMMY_NEO4J_URI \
+        --set-env-vars NEO4J_USERNAME=DUMMY_NEO4J_USERNAME \
+        --set-env-vars NEO4J_PASSWORD=DUMMY_NEO4J_PASSWORD \
+        --no-gen2 \
+        --memory 1024MB
+      ```
+
+### 2. Neo4j Setup
+1.  **Create a New Instance:**
+    *   Set up a new database instance on Neo4j AuraDB or a local Neo4j server.
+2.  **Get Credentials:**
+    *   Once the instance is running, download or note the connection credentials (URI, username, and password).
+
+### 3. Backend Setup
+
+1.  **Clone the Repository:**
+    ```bash
+    git clone https://github.com/Akhil373/GraphRAG-GCP.git
+    cd GraphRAG-GCP
+    ```
+
+2.  **Set Up Environment Variables:**
+    *   In the `backend/` directory, rename `.env.example` to `.env` file.
+    *   Populate the `.env` files with the credentials and configuration details from your GCP and Neo4j setup (e.g., GCP Project ID, GCS bucket names, Neo4j URI, username, password).
+
+3.  **Install Dependencies:**
+    *   Navigate to the backend directory:
+        ```bash
+        cd backend
+        ```
+    *   Create and activate a Python virtual environment:
+        ```bash
+        # For Unix/macOS
+        python3 -m venv .venv
+        source .venv/bin/activate
+
+        # For Windows
+        python -m venv .venv
+        .venv\Scripts\activate
+        ```
+    *   Install the required Python packages from `requirements.txt`:
+        ```bash
+        pip install -r requirements.txt
+        ```
+    *   Activate .venv inside `cd backend/rag_api_service/` by `source ../.venv/bin/activate` OR `../.venv/Scripts/activate` based on OS. Then install packages from            `requirements.txt` again.
+
+### 4. Frontend Setup
+
+1.  **Navigate to the Frontend Directory:**
+    ```bash
+    cd frontend
+    ```
+2.  **Install Dependencies:**
+    *   Run the following commands to install the necessary packages and resolve any potential dependency conflicts:
+        ```bash
+        npm install --force
+        npm audit fix --force
+        ```
+
+### 5. Running the Application
+
+1.  **Start the Backend Services:**
+    *   Open two separate terminal windows & activate python `.venv`.
+    *   In the first terminal, start the main API service:
+        ```bash
+        cd backend
+        python app.py
+        ```
+    *   In the second terminal, start the RAG API service:
+        ```bash
+        cd backend/rag_api_service
+        python app.py
+        ```
+
+2.  **Start the Frontend Application:**
+    *   Open a third terminal.
+    *   Navigate to the frontend directory and start the development server:
+        ```bash
+        cd frontend
+        npm run dev
+        ```
+    *   The application should now be running and accessible in your web browser, typically at `http://localhost:5173`.
+
 ## Architecture
 
 The application follows a microservices-oriented architecture with a React frontend, a Flask backend for primary operations, and Google Cloud Functions for specialized processing tasks.
@@ -123,10 +273,7 @@ A Flask application that provides the RAG (Retrieval Augmented Generation) capab
     *   `GET /api/graph/files`: Lists all files for a given `repo_id` from the Neo4j graph.
     *   `GET /api/graph/file-data`: Retrieves detailed information about a specific file and its directly related entities from Neo4j.
     *   `GET /api/graph/file-graph`: Retrieves nodes and relationships for visualizing a specific file and its 2-hop neighborhood from Neo4j.
-
-## Setup Instructions
-
-*(This section is intentionally left blank for you to add your specific setup instructions.)*
+    *   
 
 ## How It Works
 
