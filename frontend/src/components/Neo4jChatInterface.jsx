@@ -1,16 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import React, { useEffect, useState } from 'react';
 import addNotification from 'react-push-notification';
-import FileList from './FileList';
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import ChatPanel from './ChatPanel';
+import FileList from './FileList';
 import GraphControls from './GraphControls';
 import GraphView from './GraphView';
 import './Neo4jChatInterface.css';
-import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 
-// Updated to match the backend API from app.py
-const RAG_API_URL = 'http://localhost:5001/api/chat';
-const BASE_API_URL = 'http://localhost:5001';
+const RAG_API_BASE_URL = 'https://ragapi-service-722252932298.us-central1.run.app';
 
 function Neo4jChatInterface({ repoId }) {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -62,29 +60,13 @@ function Neo4jChatInterface({ repoId }) {
   const fetchFiles = async () => {
     setIsFilesLoading(true);
     try {
-      // Try the first URL format
-      let response;
-      try {
-        response = await axios.get(`${BASE_API_URL}/api/graph/files?repo_id=${repoId}`);
-        if (response.data.success) {
-          setFiles(response.data.files);
-          return;
-        }
-      } catch (error) {
-        console.log("First URL format failed, trying alternative...");
-      }
-
-      // Try the second URL format if first fails
-      try {
-        response = await axios.get(`${BASE_API_URL}/graph/files?repo_id=${repoId}`);
-        if (response.data.success) {
-          setFiles(response.data.files);
-          return;
-        }
-      } catch (error) {
-        console.error('Error fetching files with second URL format:', error);
+      // Use the correct base URL and path
+      const response = await axios.get(`${RAG_API_BASE_URL}/api/graph/files?repo_id=${repoId}`);
+      if (response.data.success) {
+        setFiles(response.data.files);
       }
     } catch (error) {
+      // This console log will now only trigger if the corrected URL genuinely fails
       console.error('Error fetching files:', error);
     } finally {
       setIsFilesLoading(false);
@@ -141,14 +123,14 @@ function Neo4jChatInterface({ repoId }) {
       let response, graphResponse;
       
       try {
-        response = await axios.get(`${BASE_API_URL}/api/graph/file-data?repo_id=${repoId}&file_path=${file.path}`);
+        response = await axios.get(`${RAG_API_BASE_URL}/api/graph/file-data?repo_id=${repoId}&file_path=${file.path}`);
         if (response.data.success) {
           setFileData(response.data.fileData);
         }
       } catch (error) {
         console.log("First file-data URL format failed, trying alternative...");
         try {
-          response = await axios.get(`${BASE_API_URL}/graph/file-data?repo_id=${repoId}&file_path=${file.path}`);
+          response = await axios.get(`${RAG_API_BASE_URL}/graph/file-data?repo_id=${repoId}&file_path=${file.path}`);
           if (response.data.success) {
             setFileData(response.data.fileData);
           }
@@ -161,7 +143,7 @@ function Neo4jChatInterface({ repoId }) {
       
       // Try first URL format for graph data
       try {
-        graphResponse = await axios.get(`${BASE_API_URL}/api/graph/file-graph?repo_id=${repoId}&file_path=${file.path}`);
+        graphResponse = await axios.get(`${RAG_API_BASE_URL}/api/graph/file-graph?repo_id=${repoId}&file_path=${file.path}`);
         if (graphResponse.data.success) {
           // Filter out isolated nodes (nodes without any connections)
           const connectedNodeIds = new Set();
@@ -187,7 +169,7 @@ function Neo4jChatInterface({ repoId }) {
       } catch (error) {
         console.log("First file-graph URL format failed, trying alternative...");
         try {
-          graphResponse = await axios.get(`${BASE_API_URL}/graph/file-graph?repo_id=${repoId}&file_path=${file.path}`);
+          graphResponse = await axios.get(`${RAG_API_BASE_URL}/graph/file-graph?repo_id=${repoId}&file_path=${file.path}`);
           if (graphResponse.data.success) {
             // Filter out isolated nodes (nodes without any connections)
             const connectedNodeIds = new Set();
@@ -271,7 +253,7 @@ function Neo4jChatInterface({ repoId }) {
         requestData.context = JSON.stringify(fileData);
       }
       
-      const response = await axios.post(RAG_API_URL, requestData);
+      const response = await axios.post(`${RAG_API_BASE_URL}/api/chat`, requestData);
       
       if (response.data && response.data.response) {
         const aiMessage = { 

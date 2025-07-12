@@ -51,9 +51,9 @@ function App() {
     currentFile: ''
   });
 
-  const BACKEND_BASE_URL = 'http://localhost:5000/api';
-  const RAG_API_URL = 'http://localhost:5001/api/chat';
-  const CLEAR_DB_URL = 'http://localhost:5001/api/clear-database';
+  const BACKEND_BASE_URL = 'https://main-service-722252932298.us-central1.run.app/api';
+  const RAG_API_URL = 'https://ragapi-service-722252932298.us-central1.run.app/api/chat';
+  const CLEAR_DB_URL = 'https://ragapi-service-722252932298.us-central1.run.app/api/clear-database';
 
   // State for expanded folders in the file browser
   const [expandedFolders, setExpandedFolders] = useState(new Set());
