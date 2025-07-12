@@ -396,10 +396,8 @@ def fetch_repo_files():
     repo_id = None # Initialize repo_id
 
     try:
-        # First, clear the Neo4j database
         try:
-            # Get RAG API URL from environment variable or default to localhost:5001
-            rag_api_url = os.getenv("RAG_API_URL", "http://localhost:5001")
+            rag_api_url = "https://ragapi-service-722252932298.us-central1.run.app"
             clear_db_url = f"{rag_api_url}/api/clear-database"
             
             response = requests.post(clear_db_url, timeout=30)
@@ -591,7 +589,7 @@ def get_file_content():
 if __name__ == '__main__':
     # Ensure a default GCS bucket name for local testing if not set in env
     if not os.getenv('GCS_BUCKET_NAME'):
-        os.getenv('GCS_BUCKET_NAME')
+        print('BUCKET NAME NOT SET LIL BRO')
 
     # For local testing, ensure your gcloud application-default login is done
     # gcloud auth application-default login
