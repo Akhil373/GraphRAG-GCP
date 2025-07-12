@@ -104,6 +104,16 @@ def create_vector_indexes(driver):
                 }}
             }}
         """,
+        "class_index": f"""
+            CREATE VECTOR INDEX `class_index` IF NOT EXISTS
+            FOR (c:Class) ON (c.embedding)
+            OPTIONS {{
+                indexConfig: {{
+                    `vector.dimensions`: {desired_dim},
+                    `vector.similarity_function`: 'cosine'
+                }}
+            }}
+        """,
         "operation_index": f"""
             CREATE VECTOR INDEX `operation_index` IF NOT EXISTS
             FOR (op:Operation) ON (op.embedding)
@@ -119,7 +129,7 @@ def create_vector_indexes(driver):
     try:
         with driver.session() as session:
             try:
-                existing_indexes = session.run("SHOW INDEXES WHERE name in ['file_index', 'function_index', 'operation_index']").data()
+                existing_indexes = session.run("SHOW INDEXES WHERE name in ['file_index', 'function_index', 'operation_index', 'class_index']").data()
                 
                 for index in existing_indexes:
                     index_name = index.get('name')
@@ -530,6 +540,7 @@ def retrieve_file_specific_context(query_embedding, user_query, repo_id, file_pa
         WITH e
         CALL db.index.vector.queryNodes(CASE 
             WHEN e:Function THEN 'function_index' 
+            WHEN e:Class THEN 'class_index'
             WHEN e:Operation THEN 'operation_index'
             ELSE '' END, 
             3, $embedding) YIELD node, score

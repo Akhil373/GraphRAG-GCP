@@ -4,3 +4,4 @@ neo4j
 vertexai
 google-api-core
 python-dotenv
+gunicorn
