@@ -926,7 +926,6 @@ def clear_database():
             "success": False, 
             "message": f"Unexpected error: {str(e)}"
         }), 500
-
 @app.route('/api/graph/files', methods=['GET'])
 @app.route('/graph/files', methods=['GET'])
 def get_files():
@@ -939,16 +938,56 @@ def get_files():
     try:
         driver = get_neo4j_driver()
         with driver.session() as session:
-            # Query for all file nodes for this repo
-            query = """
-            MATCH (f:File {repo_id: $repo_id})
-            RETURN f.path AS path, f.name AS name
-            ORDER BY f.path
+            # Debug: First check what file nodes exist
+            debug_query = """
+            MATCH (f:File) 
+            RETURN f.repo_id, f.path, f.name, labels(f) as labels
+            LIMIT 10
             """
-            result = session.run(query, repo_id=repo_id).data()
+            debug_result = session.run(debug_query).data()
+            app.logger.info(f"Debug - Found {len(debug_result)} file nodes: {debug_result}")
             
-            # Convert result to file list
-            files = [{'path': file['path'], 'name': file['name']} for file in result]
+            # Try multiple query patterns to find files
+            queries_to_try = [
+                # Original query
+                """
+                MATCH (f:File {repo_id: $repo_id})
+                RETURN f.path AS path, f.name AS name
+                ORDER BY f.path
+                """,
+                # Try with file_path property instead of path
+                """
+                MATCH (f:File {repo_id: $repo_id})
+                RETURN COALESCE(f.path, f.file_path) AS path, f.name AS name
+                ORDER BY path
+                """,
+                # Try matching repo_id as substring
+                """
+                MATCH (f:File) 
+                WHERE f.repo_id CONTAINS $repo_id OR $repo_id CONTAINS f.repo_id
+                RETURN COALESCE(f.path, f.file_path) AS path, f.name AS name
+                ORDER BY path
+                """,
+                # Try with different file type labels
+                """
+                MATCH (f) 
+                WHERE (f:File OR f:SourceFile OR f:PythonModule OR f:DataFile) 
+                AND (f.repo_id = $repo_id OR f.repo_id CONTAINS $repo_id OR $repo_id CONTAINS f.repo_id)
+                RETURN COALESCE(f.path, f.file_path) AS path, COALESCE(f.name, f.path) AS name
+                ORDER BY path
+                """
+            ]
+            
+            files = []
+            for i, query in enumerate(queries_to_try):
+                try:
+                    result = session.run(query, repo_id=repo_id).data()
+                    app.logger.info(f"Query {i+1} returned {len(result)} results")
+                    if result:
+                        files = [{'path': file['path'], 'name': file['name']} for file in result if file['path']]
+                        break
+                except Exception as e:
+                    app.logger.warning(f"Query {i+1} failed: {e}")
             
             return jsonify({
                 'success': True,
