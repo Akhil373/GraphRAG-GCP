@@ -86,15 +86,18 @@
   background-color: rgba(106, 183, 255, 0.08);
 }
 
-/* Main content container */
+/* Main content container - Updated for new layout */
 .main-content {
   flex: 1;
-  padding: 1rem 2rem;
-  max-width: 1400px;
+  padding: 0.5rem 1rem;
+  max-width: 1600px; /* Increased for better use of space */
   width: 100%;
   margin: 0 auto;
   animation: fadeIn 0.5s ease-out;
   position: relative;
+  min-height: calc(100vh - 100px); /* Ensure minimum height */
+  overflow-y: auto; /* Allow vertical scrolling */
+  overflow-x: hidden;
 }
 
 /* Welcome view styling */

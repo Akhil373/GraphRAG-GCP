@@ -150,6 +150,18 @@ function App() {
     setShowConfirmDialog(false);
   };
 
+  // Handle navigation back to home
+  const handleBackToHome = () => {
+    setUiState('welcome');
+    setApiState(API_STATUS.IDLE);
+    setRepoId('');
+    setChatHistory([]);
+    setChatQuery('');
+    setSelectedFiles([]);
+    setFiles([]);
+    setGithubUrl('');
+  };
+
   const handleSubmitRepo = async (e) => {
     e.preventDefault();
     if (!githubUrl.trim()) return;
@@ -529,25 +541,23 @@ function App() {
   };
 
   // New function to render the header
-  const renderHeader = () => (
-    <header className={`app-header ${!isHeaderVisible ? 'header-hidden' : ''}`}>
-      <div className="logo-container">
-        <h1 className="logo-text">{webname}</h1>
-      </div>
-      <div className="header-actions">
-        {uiState === 'chat' && (
-          <button 
-            className="btn btn-secondary" 
-            onClick={handleStartNewClick}
-            disabled={isClearing}
-          >
-            Start New
-          </button>
-        )}
-        <ThemeToggle />
-      </div>
-    </header>
-  );
+  const renderHeader = () => {
+    // Hide header when in chat mode to avoid duplicate "Analyo" title
+    if (uiState === 'chat') {
+      return null;
+    }
+    
+    return (
+      <header className={`app-header ${!isHeaderVisible ? 'header-hidden' : ''}`}>
+        <div className="logo-container">
+          <h1 className="logo-text">{webname}</h1>
+        </div>
+        <div className="header-actions">
+          <ThemeToggle />
+        </div>
+      </header>
+    );
+  };
 
   const renderWelcomeView = () => (
     <div className="welcome-container">
@@ -799,7 +809,7 @@ function App() {
       case 'file-selection':
         return renderFileSelectionView();
       case 'chat':
-        return <Neo4jChatInterface repoId={repoId} />;
+        return <Neo4jChatInterface repoId={repoId} onBackToHome={handleBackToHome} />;
       default:
         return renderWelcomeView();
     }
