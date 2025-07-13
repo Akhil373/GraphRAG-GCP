@@ -1,13 +1,15 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
+import { ThemeContext } from '../ThemeContext';
 
-function GraphView({ graphData, selectedFile, isLoading }) {
+function GraphView({ graphData, selectedFile, isLoading, graphViewOpen }) {
   const graphRef = useRef();
   const [hoveredNode, setHoveredNode] = useState(null);
   const [currentZoom, setCurrentZoom] = useState(1);
   const [nodeSize, setNodeSize] = useState(8);
   const [linkStrength, setLinkStrength] = useState(0.6);
   const [highlightedNodes, setHighlightedNodes] = useState(new Set());
+  const theme = useContext(ThemeContext)
   
   // Helper function to get node color
   const getNodeColor = (node) => {
@@ -257,6 +259,7 @@ function GraphView({ graphData, selectedFile, isLoading }) {
     <div className="graph-view">
       <div className="graph-view-header">
         <h3>Graph View</h3>
+
         {selectedFile && <p className="selected-file-info">{selectedFile.path}</p>}
         {highlightedNodes.size > 0 && (
           <button 
@@ -266,9 +269,19 @@ function GraphView({ graphData, selectedFile, isLoading }) {
             Clear Highlights
           </button>
         )}
+
+        <button 
+                className="close-graph-btn"
+                onClick={() => graphViewOpen()}
+                title="Close Graph View"
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+        </button>
       </div>
       
-      <div className="graph-container">
+      <div className={`graph-container`}>
         {isLoading ? (
           <div className="loading-container">
             <div className="spinner">

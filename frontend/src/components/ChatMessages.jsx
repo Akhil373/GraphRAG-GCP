@@ -1,8 +1,9 @@
-import React, { useEffect, useRef } from 'react';
-import { docco } from 'react-syntax-highlighter/dist/esm/styles/hljs';
-import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+import { marked } from 'marked';
+import React, { useContext, useEffect, useRef } from 'react';
 import SyntaxHighlighter from 'react-syntax-highlighter';
+import { atomOneDark, docco } from 'react-syntax-highlighter/dist/esm/styles/hljs';
+import { ThemeContext } from '../ThemeContext';
 
 function ChatMessages({ 
   chatHistory, 
@@ -11,7 +12,11 @@ function ChatMessages({
   selectedFile
 }) {
   const chatEndRef = useRef(null);
+  const { theme } = useContext(ThemeContext); // Get current theme
   
+  // Choose syntax highlighting style based on theme
+  const syntaxTheme = theme === 'dark' ? atomOneDark : docco;
+
   // Scroll to bottom whenever chat history changes
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -44,7 +49,7 @@ function ChatMessages({
           <div className="code-snippet">
             <SyntaxHighlighter 
               language={language} 
-              style={docco}
+              style={syntaxTheme}
               wrapLines={true}
               showLineNumbers={true}
             >
@@ -95,7 +100,7 @@ function ChatMessages({
         <div key={`code-${match.index}`} className="code-block-container">
           <SyntaxHighlighter 
             language={language} 
-            style={docco}
+            style={syntaxTheme}
             wrapLines={true}
             showLineNumbers={true}
           >
@@ -145,7 +150,7 @@ function ChatMessages({
   }
 
   return (
-    <div className="analyo-chat-messages">
+    <div className={`analyo-chat-messages ${theme}-theme`}>
       {chatHistory.length === 0 ? (
         <div className="analyo-empty-state">
           {selectedFile ? (

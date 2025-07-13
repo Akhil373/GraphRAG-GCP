@@ -589,7 +589,7 @@ def get_file_content():
 if __name__ == '__main__':
     # Ensure a default GCS bucket name for local testing if not set in env
     if not os.getenv('GCS_BUCKET_NAME'):
-        print('BUCKET NAME NOT SET LIL BRO')
+        print('BUCKET NAME NOT SET')
 
     # For local testing, ensure your gcloud application-default login is done
     # gcloud auth application-default login
