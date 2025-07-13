@@ -4,13 +4,14 @@
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  padding: 0 10px 0 10px;
 }
 
 /* Header styles */
 .app-header {
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -76,6 +77,11 @@
   transition: all 0.2s ease;
   width: 40px;
   height: 40px;
+}
+
+.main-content {
+  background-color: var(--background-color);
+  color: var(--text-color);
 }
 
 .light-theme .theme-toggle:hover {
@@ -565,6 +571,8 @@
 
 /* Chat view styles */
 .chat-container {
+  background-color: var(--background-color);
+  color: var(--text-color);
   display: flex;
   flex-direction: column;
   height: calc(100vh - 74px); /* Adjust based on header height */
@@ -640,16 +648,6 @@
   margin: 0 auto;
   background-color: inherit;
   z-index: 10;
-}
-
-.light-theme .chat-input-container {
-  background-color: var(--background-light);
-  border-color: var(--border-light);
-}
-
-.dark-theme .chat-input-container {
-  background-color: var(--background-dark);
-  border-color: var(--border-dark);
 }
 
 .chat-form {
@@ -781,6 +779,7 @@ code {
 @media (max-width: 768px) {
   .app-header {
     padding: 0.75rem 1rem;
+    z-index: 1000;
   }
   
   .main-content {
@@ -1082,4 +1081,30 @@ code {
   to {
     opacity: 1;
   }
+}
+
+/* Add to your CSS file */
+.analyo-chat-messages.light-theme {
+  --message-bg-user: #f0f7ff;
+  --message-bg-ai: #ffffff;
+  --message-text: #333333;
+  --border-color: #e1e4e8;
+}
+
+.analyo-chat-messages.dark-theme {
+  --message-bg-user: #1e3a8a;
+  --message-bg-ai: #1e293b;
+  --message-text: #f8fafc;
+  --border-color: #334155;
+}
+
+.analyo-message.user-message {
+  background-color: var(--message-bg-user);
+  color: var(--message-text);
+}
+
+.analyo-message.ai-message {
+  background-color: var(--message-bg-ai);
+  color: var(--message-text);
+  border-color: var(--border-color);
 }

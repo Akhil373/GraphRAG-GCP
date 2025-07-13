@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef, useContext } from 'react';
 import axios from 'axios';
-import { ThemeContext } from './ThemeContext';
-import ThemeToggle from './components/ThemeToggle';
-import Neo4jChatInterface from './components/Neo4jChatInterface';
+import { useContext, useEffect, useRef, useState } from 'react';
 import './App.css';
+import { ThemeContext } from './ThemeContext';
+import Neo4jChatInterface from './components/Neo4jChatInterface';
+import ThemeToggle from './components/ThemeToggle';
 
 const webname = "Analyo";
 
@@ -34,7 +34,6 @@ function App() {
 
   const [chatQuery, setChatQuery] = useState('');
   const [chatHistory, setChatHistory] = useState([]);
-  const [isChatLoading, setIsChatLoading] = useState(false);
   const chatEndRef = useRef(null);
   const [fileSearchTerm, setFileSearchTerm] = useState('');
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
@@ -340,29 +339,6 @@ function App() {
     }
   };
 
-  const handleChatQuerySubmit = async (e) => {
-    e.preventDefault();
-    if (!chatQuery.trim() || isChatLoading) return;
-
-    const userMessage = { sender: 'user', text: chatQuery };
-    setChatHistory((prev) => [...prev, userMessage]);
-    setChatQuery('');
-
-    setIsChatLoading(true);
-
-    try {
-      const response = await axios.post(RAG_API_URL, { query: chatQuery });
-      const aiMessage = { sender: 'ai', text: response.data.response };
-      setChatHistory((prev) => [...prev, aiMessage]);
-    } catch (error) {
-      console.error('Error with RAG API:', error);
-      const errorMessage = { sender: 'ai', text: `An error occurred: ${error.message}` };
-      setChatHistory((prev) => [...prev, errorMessage]);
-    } finally {
-      setIsChatLoading(false);
-    }
-  };
-
   // Filter files based on search term
   const filteredFiles = fileSearchTerm
     ? files.filter(file => file.toLowerCase().includes(fileSearchTerm.toLowerCase()))
@@ -541,23 +517,25 @@ function App() {
   };
 
   // New function to render the header
-  const renderHeader = () => {
-    // Hide header when in chat mode to avoid duplicate "Analyo" title
-    if (uiState === 'chat') {
-      return null;
-    }
-    
-    return (
-      <header className={`app-header ${!isHeaderVisible ? 'header-hidden' : ''}`}>
-        <div className="logo-container">
-          <h1 className="logo-text">{webname}</h1>
-        </div>
-        <div className="header-actions">
-          <ThemeToggle />
-        </div>
-      </header>
-    );
-  };
+  const renderHeader = () => (
+    <header className={`app-header ${!isHeaderVisible ? 'header-hidden' : ''}`}>
+      <div className="logo-container">
+        <h1 className="logo-text">{webname}</h1>
+      </div>
+      <div className="header-actions">
+        {uiState === 'chat' && (
+          <button 
+            className="btn btn-secondary" 
+            onClick={handleStartNewClick}
+            disabled={isClearing}
+          >
+            Start New
+          </button>
+        )}
+        <ThemeToggle />
+      </div>
+    </header>
+  );
 
   const renderWelcomeView = () => (
     <div className="welcome-container">
@@ -796,7 +774,7 @@ function App() {
   };
 
   const renderChatView = () => {
-    return <Neo4jChatInterface repoId={repoId} />;
+    return <Neo4jChatInterface repoId={repoId} onBackToHome={handleBackToHome} onStartNew={handleStartNewClick} />;
   };
 
   // Main render logic
@@ -809,7 +787,7 @@ function App() {
       case 'file-selection':
         return renderFileSelectionView();
       case 'chat':
-        return <Neo4jChatInterface repoId={repoId} onBackToHome={handleBackToHome} />;
+        return renderChatView();
       default:
         return renderWelcomeView();
     }
@@ -818,7 +796,7 @@ function App() {
   return (
     <div className={`app-container ${theme}-theme`}>
       {renderHeader()}
-      <main className="main-content">
+      <main className={`main-container ${theme}-theme`}>
         {renderContent()}
       </main>
       

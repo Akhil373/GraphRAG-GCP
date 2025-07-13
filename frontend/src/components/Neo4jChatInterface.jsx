@@ -1,6 +1,8 @@
 import axios from 'axios';
-import React, { useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import addNotification from 'react-push-notification';
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
+import { ThemeContext } from '../ThemeContext';
 import ChatMessages from './ChatMessages';
 import FileList from './FileList';
 import GraphControls from './GraphControls';
@@ -9,16 +11,17 @@ import './Neo4jChatInterface.css';
 
 const RAG_API_BASE_URL = 'https://ragapi-service-722252932298.us-central1.run.app';
 
-function Neo4jChatInterface({ repoId, onBackToHome }) {
+function Neo4jChatInterface({ repoId }) {
+  const { theme } = useContext(ThemeContext);
   const [selectedFile, setSelectedFile] = useState(null);
   const [files, setFiles] = useState([]);
   const [fileData, setFileData] = useState(null);
   const [chatHistory, setChatHistory] = useState([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [isFilesLoading, setIsFilesLoading] = useState(false);
-  const [isGraphLoading, setIsGraphLoading] = useState(false);
   const [isFileDataLoading, setIsFileDataLoading] = useState(false);
   const [chatQuery, setChatQuery] = useState('');
+  const [isGraphLoading, setIsGraphLoading] = useState(false);
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
   const [graphFilters, setGraphFilters] = useState({
     nodeTypes: [],
@@ -28,6 +31,10 @@ function Neo4jChatInterface({ repoId, onBackToHome }) {
   });
   const [isGraphViewOpen, setIsGraphViewOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+
+  const toggleGraphViewOpen = () => {
+    setIsGraphViewOpen((prev) => !prev);
+  }
 
   // Notify when file processing is complete
   const entryNotification = () => {
@@ -128,7 +135,7 @@ function Neo4jChatInterface({ repoId, onBackToHome }) {
           setFileData(response.data.fileData);
         }
       } catch (error) {
-        console.log("First file-data URL format failed, trying alternative...");
+        console.log(`First file-data URL format failed, trying alternative...${error}`);
         try {
           response = await axios.get(`${RAG_API_BASE_URL}/graph/file-data?repo_id=${repoId}&file_path=${file.path}`);
           if (response.data.success) {
@@ -167,7 +174,7 @@ function Neo4jChatInterface({ repoId, onBackToHome }) {
           processGraphData(filteredGraphData);
         }
       } catch (error) {
-        console.log("First file-graph URL format failed, trying alternative...");
+        console.log(`First file-graph URL format failed, trying alternative...${error}`);
         try {
           graphResponse = await axios.get(`${RAG_API_BASE_URL}/graph/file-graph?repo_id=${repoId}&file_path=${file.path}`);
           if (graphResponse.data.success) {
@@ -233,7 +240,6 @@ function Neo4jChatInterface({ repoId, onBackToHome }) {
     setChatQuery('');
     
     try {
-      // Prepare request data based on whether we're in repo context or file context
       const requestData = {
         query: chatQuery,
         repo_id: repoId,
@@ -416,19 +422,21 @@ function Neo4jChatInterface({ repoId, onBackToHome }) {
   }, [graphData, graphFilters]);
 
   // Handle starting a new session
-  const handleStartNew = () => {
-    if (onBackToHome) {
-      onBackToHome();
-    } else {
-      // Fallback if no callback provided
-      setChatHistory([]);
-      setSelectedFile(null);
-      setFileData(null);
-      setGraphData({ nodes: [], links: [] });
-      setChatQuery('');
-      setIsGraphViewOpen(false);
-    }
-  };
+  // const handleStartNew = () => {
+  //   if (onStartNew) {
+  //     onStartNew();
+  //   } else if (onBackToHome) {
+  //     onBackToHome();
+  //   } else {
+  //     // Fallback if no callback provided
+  //     setChatHistory([]);
+  //     setSelectedFile(null);
+  //     setFileData(null);
+  //     setGraphData({ nodes: [], links: [] });
+  //     setChatQuery('');
+  //     setIsGraphViewOpen(false);
+  //   }
+  // };
 
   // Filter files based on search term
   const filteredFiles = searchTerm
@@ -441,20 +449,9 @@ function Neo4jChatInterface({ repoId, onBackToHome }) {
   return (
     <div className="analyo-interface">
       {/* Left Sidebar */}
-      <aside className="left-sidebar">
-        <div className="sidebar-header">
-          <h1 className="app-name">Analyo</h1>
-          <button 
-            className="start-new-btn"
-            onClick={handleStartNew}
-            title="Start with New Repository"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M3 12h18m-9-9l9 9-9 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Start with New Repo
-          </button>
-        </div>
+      <PanelGroup direction="horizontal">
+        <Panel className="panel-sidebar" defaultSize={20} minSize={10}>
+      <aside className={`left-sidebar ${theme}-theme`}>
 
         <div className="sidebar-search">
           <div className="search-container">
@@ -487,26 +484,29 @@ function Neo4jChatInterface({ repoId, onBackToHome }) {
           </div>
         </div>
       </aside>
+      </Panel>
+      <PanelResizeHandle className={`resize-handle ${theme}-theme`} />
 
       {/* Main Content Area */}
-      <main className="main-content">
-        <div className="chat-container">
+      <Panel minSize={50} className={`messages-panel ${theme}-theme`}>
+      <main className = {`main-content ${theme}-theme`}>
+        <div className={`chat-container ${theme}-theme`}>
           {/* View Graph Button */}
           <button 
-            className={`view-graph-btn ${isGraphViewOpen ? 'active' : ''}`}
-            onClick={() => setIsGraphViewOpen(!isGraphViewOpen)}
-            title={isGraphViewOpen ? "Hide Graph" : "View Graph"}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
-              <circle cx="12" cy="3" r="1" stroke="currentColor" strokeWidth="2"/>
-              <circle cx="21" cy="12" r="1" stroke="currentColor" strokeWidth="2"/>
-              <circle cx="12" cy="21" r="1" stroke="currentColor" strokeWidth="2"/>
-              <circle cx="3" cy="12" r="1" stroke="currentColor" strokeWidth="2"/>
-              <path d="m9.88 9.88 4.24 4.24" stroke="currentColor" strokeWidth="2"/>
-              <path d="m9.88 14.12 4.24-4.24" stroke="currentColor" strokeWidth="2"/>
-            </svg>
-            {isGraphViewOpen ? 'Hide Graph' : 'View Graph'}
+                    className={`view-graph-btn ${theme}-theme ${isGraphViewOpen ? 'active' : ''}`}
+                    onClick={() => setIsGraphViewOpen(!isGraphViewOpen)}
+                    title={isGraphViewOpen ? "Hide Graph" : "View Graph"}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
+                      <circle cx="12" cy="3" r="1" stroke="currentColor" strokeWidth="2"/>
+                      <circle cx="21" cy="12" r="1" stroke="currentColor" strokeWidth="2"/>
+                      <circle cx="12" cy="21" r="1" stroke="currentColor" strokeWidth="2"/>
+                      <circle cx="3" cy="12" r="1" stroke="currentColor" strokeWidth="2"/>
+                      <path d="m9.88 9.88 4.24 4.24" stroke="currentColor" strokeWidth="2"/>
+                      <path d="m9.88 14.12 4.24-4.24" stroke="currentColor" strokeWidth="2"/>
+                    </svg>
+                    {isGraphViewOpen ? 'Hide Graph' : 'View Graph'}
           </button>
 
           {/* Chat Messages Area */}
@@ -525,6 +525,7 @@ function Neo4jChatInterface({ repoId, onBackToHome }) {
             ) : (
               <div className="chat-content">
                 <div className="file-header">
+                  
                   <div className="file-info">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -532,6 +533,7 @@ function Neo4jChatInterface({ repoId, onBackToHome }) {
                     </svg>
                     <span className="file-path">{selectedFile.path}</span>
                   </div>
+  
                 </div>
                 
                 <div className="messages-list">
@@ -547,9 +549,9 @@ function Neo4jChatInterface({ repoId, onBackToHome }) {
           </div>
 
           {/* Chat Input - Always at bottom */}
-          <div className="chat-input-section">
+          <div className={`chat-input-section ${theme}-theme`}>
             <form onSubmit={handleChatQuerySubmit} className="chat-input-form">
-              <div className="input-container">
+              <div className={`input-container ${theme}-theme`}>
                 <textarea
                   className="chat-textarea"
                   value={chatQuery}
@@ -583,6 +585,8 @@ function Neo4jChatInterface({ repoId, onBackToHome }) {
           </div>
         </div>
       </main>
+      </Panel>
+      </PanelGroup>
 
       {/* Toggleable Graph View */}
       {isGraphViewOpen && (
@@ -590,15 +594,6 @@ function Neo4jChatInterface({ repoId, onBackToHome }) {
           <div className="graph-panel">
             <div className="graph-header">
               <h3>Code Graph Visualization</h3>
-              <button 
-                className="close-graph-btn"
-                onClick={() => setIsGraphViewOpen(false)}
-                title="Close Graph View"
-              >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </button>
             </div>
             <div className="graph-content">
               <div className="graph-controls-section">
@@ -612,6 +607,7 @@ function Neo4jChatInterface({ repoId, onBackToHome }) {
                   graphData={filteredGraphData}
                   selectedFile={selectedFile}
                   isLoading={isGraphLoading}
+                  graphViewOpen={toggleGraphViewOpen}
                 />
               </div>
             </div>
