@@ -1,16 +1,18 @@
 import axios from 'axios';
 import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import addNotification from 'react-push-notification';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
-import ChatPanel from './ChatPanel';
+import ChatMessages from './ChatMessages';
 import FileList from './FileList';
 import GraphControls from './GraphControls';
 import GraphView from './GraphView';
 import './Neo4jChatInterface.css';
 
 const RAG_API_BASE_URL = 'https://ragapi-service-722252932298.us-central1.run.app';
+const RAG_API_BASE_URL = 'https://ragapi-service-722252932298.us-central1.run.app';
 
-function Neo4jChatInterface({ repoId }) {
+function Neo4jChatInterface({ repoId, onBackToHome }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [files, setFiles] = useState([]);
   const [fileData, setFileData] = useState(null);
@@ -27,8 +29,10 @@ function Neo4jChatInterface({ repoId }) {
     showAllNodeTypes: true,
     showAllRelationshipTypes: true,
   });
+  const [isGraphViewOpen, setIsGraphViewOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
-
+  // Notify when file processing is complete
   const entryNotification = () => {
     addNotification({
       title: 'Completed processing files',
@@ -64,8 +68,13 @@ function Neo4jChatInterface({ repoId }) {
       const response = await axios.get(`${RAG_API_BASE_URL}/api/graph/files?repo_id=${repoId}`);
       if (response.data.success) {
         setFiles(response.data.files);
+      // Use the correct base URL and path
+      const response = await axios.get(`${RAG_API_BASE_URL}/api/graph/files?repo_id=${repoId}`);
+      if (response.data.success) {
+        setFiles(response.data.files);
       }
     } catch (error) {
+      // This console log will now only trigger if the corrected URL genuinely fails
       // This console log will now only trigger if the corrected URL genuinely fails
       console.error('Error fetching files:', error);
     } finally {
@@ -124,12 +133,14 @@ function Neo4jChatInterface({ repoId }) {
       
       try {
         response = await axios.get(`${RAG_API_BASE_URL}/api/graph/file-data?repo_id=${repoId}&file_path=${file.path}`);
+        response = await axios.get(`${RAG_API_BASE_URL}/api/graph/file-data?repo_id=${repoId}&file_path=${file.path}`);
         if (response.data.success) {
           setFileData(response.data.fileData);
         }
       } catch (error) {
         console.log("First file-data URL format failed, trying alternative...");
         try {
+          response = await axios.get(`${RAG_API_BASE_URL}/graph/file-data?repo_id=${repoId}&file_path=${file.path}`);
           response = await axios.get(`${RAG_API_BASE_URL}/graph/file-data?repo_id=${repoId}&file_path=${file.path}`);
           if (response.data.success) {
             setFileData(response.data.fileData);
@@ -143,6 +154,7 @@ function Neo4jChatInterface({ repoId }) {
       
       // Try first URL format for graph data
       try {
+        graphResponse = await axios.get(`${RAG_API_BASE_URL}/api/graph/file-graph?repo_id=${repoId}&file_path=${file.path}`);
         graphResponse = await axios.get(`${RAG_API_BASE_URL}/api/graph/file-graph?repo_id=${repoId}&file_path=${file.path}`);
         if (graphResponse.data.success) {
           // Filter out isolated nodes (nodes without any connections)
@@ -169,6 +181,7 @@ function Neo4jChatInterface({ repoId }) {
       } catch (error) {
         console.log("First file-graph URL format failed, trying alternative...");
         try {
+          graphResponse = await axios.get(`${RAG_API_BASE_URL}/graph/file-graph?repo_id=${repoId}&file_path=${file.path}`);
           graphResponse = await axios.get(`${RAG_API_BASE_URL}/graph/file-graph?repo_id=${repoId}&file_path=${file.path}`);
           if (graphResponse.data.success) {
             // Filter out isolated nodes (nodes without any connections)
@@ -253,6 +266,7 @@ function Neo4jChatInterface({ repoId }) {
         requestData.context = JSON.stringify(fileData);
       }
       
+      const response = await axios.post(`${RAG_API_BASE_URL}/api/chat`, requestData);
       const response = await axios.post(`${RAG_API_BASE_URL}/api/chat`, requestData);
       
       if (response.data && response.data.response) {
@@ -415,55 +429,211 @@ function Neo4jChatInterface({ repoId }) {
     };
   }, [graphData, graphFilters]);
 
+  // Handle starting a new session
+  const handleStartNew = () => {
+    if (onBackToHome) {
+      onBackToHome();
+    } else {
+      // Fallback if no callback provided
+      setChatHistory([]);
+      setSelectedFile(null);
+      setFileData(null);
+      setGraphData({ nodes: [], links: [] });
+      setChatQuery('');
+      setIsGraphViewOpen(false);
+    }
+  };
+
+  // Filter files based on search term
+  const filteredFiles = searchTerm
+    ? files.filter(file => 
+        file.path.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        file.name.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : files;
+
   return (
-    <div className="neo4j-chat-interface">
-      <PanelGroup direction="horizontal">
-        <Panel defaultSize={20} minSize={15}>
-          <div className="file-list-column">
+    <div className="analyo-interface">
+      {/* Left Sidebar */}
+      <aside className="left-sidebar">
+        <div className="sidebar-header">
+          <h1 className="app-name">Analyo</h1>
+          <button 
+            className="start-new-btn"
+            onClick={handleStartNew}
+            title="Start with New Repository"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 12h18m-9-9l9 9-9 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            Start with New Repo
+          </button>
+        </div>
+
+        <div className="sidebar-search">
+          <div className="search-container">
+            <svg className="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2"/>
+              <path d="m21 21-4.35-4.35" stroke="currentColor" strokeWidth="2"/>
+            </svg>
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Search files..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="file-tree">
+          <div className="file-tree-header">
+            <span>Repository Files</span>
+            {isFilesLoading && <div className="loading-spinner"></div>}
+          </div>
+          <div className="file-tree-content">
             <FileList
-              files={files}
+              files={filteredFiles}
               selectedFile={selectedFile}
               onFileSelect={handleFileSelect}
               isLoading={isFilesLoading}
             />
           </div>
-        </Panel>
-        <PanelResizeHandle />
-        <Panel minSize={30}>
-          <div className="chat-panel-column">
-            <ChatPanel
-              chatHistory={chatHistory}
-              chatQuery={chatQuery}
-              setChatQuery={setChatQuery}
-              handleChatQuerySubmit={handleChatQuerySubmit}
-              isChatLoading={isChatLoading}
-              selectedFile={selectedFile}
-              isFileDataLoading={isFileDataLoading}
-            />
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <main className="main-content">
+        <div className="chat-container">
+          {/* View Graph Button */}
+          <button 
+            className={`view-graph-btn ${isGraphViewOpen ? 'active' : ''}`}
+            onClick={() => setIsGraphViewOpen(!isGraphViewOpen)}
+            title={isGraphViewOpen ? "Hide Graph" : "View Graph"}
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
+              <circle cx="12" cy="3" r="1" stroke="currentColor" strokeWidth="2"/>
+              <circle cx="21" cy="12" r="1" stroke="currentColor" strokeWidth="2"/>
+              <circle cx="12" cy="21" r="1" stroke="currentColor" strokeWidth="2"/>
+              <circle cx="3" cy="12" r="1" stroke="currentColor" strokeWidth="2"/>
+              <path d="m9.88 9.88 4.24 4.24" stroke="currentColor" strokeWidth="2"/>
+              <path d="m9.88 14.12 4.24-4.24" stroke="currentColor" strokeWidth="2"/>
+            </svg>
+            {isGraphViewOpen ? 'Hide Graph' : 'View Graph'}
+          </button>
+
+          {/* Chat Messages Area */}
+          <div className="chat-messages">
+            {!selectedFile ? (
+              <div className="welcome-message">
+                <div className="welcome-icon">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+                <h2>Ask about this file</h2>
+                <p>Select a file from the sidebar to start analyzing your code with AI assistance.</p>
+              </div>
+            ) : (
+              <div className="chat-content">
+                <div className="file-header">
+                  <div className="file-info">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    <span className="file-path">{selectedFile.path}</span>
+                  </div>
+                </div>
+                
+                <div className="messages-list">
+                  <ChatMessages
+                    chatHistory={chatHistory}
+                    isChatLoading={isChatLoading}
+                    selectedFile={selectedFile}
+                    isFileDataLoading={isFileDataLoading}
+                  />
+                </div>
+              </div>
+            )}
           </div>
-        </Panel>
-        <PanelResizeHandle />
-        <Panel defaultSize={20} minSize={15}>
-          <div className="graph-controls-column">
-            <GraphControls
-              filters={graphFilters}
-              onFilterChange={handleGraphFilterChange}
-            />
+
+          {/* Chat Input - Always at bottom */}
+          <div className="chat-input-section">
+            <form onSubmit={handleChatQuerySubmit} className="chat-input-form">
+              <div className="input-container">
+                <textarea
+                  className="chat-textarea"
+                  value={chatQuery}
+                  onChange={(e) => setChatQuery(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleChatQuerySubmit(e);
+                    }
+                  }}
+                  placeholder={selectedFile 
+                    ? selectedFile.isRepoContext
+                      ? "Ask about the repository's code structure, architecture, and relationships..."
+                      : `Ask about ${selectedFile.name}...` 
+                    : "Select a file to start chatting..."
+                  }
+                  disabled={isChatLoading || !selectedFile || isFileDataLoading}
+                  rows={1}
+                />
+                <button 
+                  type="submit" 
+                  className="send-button"
+                  disabled={isChatLoading || !chatQuery.trim() || !selectedFile || isFileDataLoading}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M22 2L11 13M22 2L15 22L11 13M22 2L2 9L11 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              </div>
+            </form>
           </div>
-        </Panel>
-        <PanelResizeHandle />
-        <Panel defaultSize={25} minSize={20}>
-          <div className="graph-view-column">
-            <GraphView
-              graphData={filteredGraphData}
-              selectedFile={selectedFile}
-              isLoading={isGraphLoading}
-            />
+        </div>
+      </main>
+
+      {/* Toggleable Graph View */}
+      {isGraphViewOpen && (
+        <div className="graph-overlay">
+          <div className="graph-panel">
+            <div className="graph-header">
+              <h3>Code Graph Visualization</h3>
+              <button 
+                className="close-graph-btn"
+                onClick={() => setIsGraphViewOpen(false)}
+                title="Close Graph View"
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            </div>
+            <div className="graph-content">
+              <div className="graph-controls-section">
+                <GraphControls
+                  filters={graphFilters}
+                  onFilterChange={handleGraphFilterChange}
+                />
+              </div>
+              <div className="graph-view-section">
+                <GraphView
+                  graphData={filteredGraphData}
+                  selectedFile={selectedFile}
+                  isLoading={isGraphLoading}
+                />
+              </div>
+            </div>
           </div>
-        </Panel>
-      </PanelGroup>
+        </div>
+      )}
     </div>
   );
 }
 
-export default Neo4jChatInterface; 
+export default Neo4jChatInterface;
