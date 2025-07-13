@@ -11,7 +11,7 @@ import './Neo4jChatInterface.css';
 
 const RAG_API_BASE_URL = 'https://ragapi-service-722252932298.us-central1.run.app';
 
-function Neo4jChatInterface({ repoId }) {
+function Neo4jChatInterface({ repoId, onBackToHome }) {
   const { theme } = useContext(ThemeContext);
   const [selectedFile, setSelectedFile] = useState(null);
   const [files, setFiles] = useState([]);
@@ -446,8 +446,10 @@ function Neo4jChatInterface({ repoId }) {
 
   return (
     <div className="analyo-interface">
-      {/* Left Sidebar */}
-      <aside className="left-sidebar">
+      <PanelGroup direction="horizontal">
+        {/* Left Sidebar */}
+        <Panel minSize={20} defaultSize={25} maxSize={40}>
+          <aside className="left-sidebar">
         <div className="sidebar-header">
           <h1 className="app-name">Analyo</h1>
           <button 
@@ -493,11 +495,12 @@ function Neo4jChatInterface({ repoId }) {
           </div>
         </div>
       </aside>
-      </Panel>
-      <PanelResizeHandle className={`resize-handle ${theme}-theme`} />
+        </Panel>
+        
+        <PanelResizeHandle className={`resize-handle ${theme}-theme`} />
 
-      {/* Main Content Area */}
-      <Panel minSize={50} className={`messages-panel ${theme}-theme`}>
+        {/* Main Content Area */}
+        <Panel minSize={50} className={`messages-panel ${theme}-theme`}>
       <main className = {`main-content ${theme}-theme`}>
         <div className={`chat-container ${theme}-theme`}>
           {/* View Graph Button */}
