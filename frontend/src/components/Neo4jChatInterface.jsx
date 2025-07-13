@@ -415,18 +415,31 @@ function Neo4jChatInterface({ repoId, onBackToHome }) {
     };
   }, [graphData, graphFilters]);
 
-  // Handle starting a new session
+  // Handle starting a new session - Clear all component state
   const handleStartNew = () => {
+    // Clear all local component state first
+    setSelectedFile(null);
+    setFiles([]);
+    setFileData(null);
+    setChatHistory([]);
+    setIsChatLoading(false);
+    setIsFilesLoading(false);
+    setIsGraphLoading(false);
+    setIsFileDataLoading(false);
+    setChatQuery('');
+    setGraphData({ nodes: [], links: [] });
+    setGraphFilters({
+      nodeTypes: [],
+      relationshipTypes: [],
+      showAllNodeTypes: true,
+      showAllRelationshipTypes: true,
+    });
+    setIsGraphViewOpen(false);
+    setSearchTerm('');
+    
+    // Call parent function to reset App-level state
     if (onBackToHome) {
       onBackToHome();
-    } else {
-      // Fallback if no callback provided
-      setChatHistory([]);
-      setSelectedFile(null);
-      setFileData(null);
-      setGraphData({ nodes: [], links: [] });
-      setChatQuery('');
-      setIsGraphViewOpen(false);
     }
   };
 
@@ -447,10 +460,10 @@ function Neo4jChatInterface({ repoId, onBackToHome }) {
           <button 
             className="start-new-btn"
             onClick={handleStartNew}
-            title="Start with New Repository"
+            title="Start with New Repository - Clear all data and return to homepage"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M3 12h18m-9-9l9 9-9 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M3 12h18M21 12l-6-6m6 6l-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
             Start with New Repo
           </button>
