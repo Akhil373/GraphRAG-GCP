@@ -170,7 +170,7 @@ function ChatMessages({
                   <path d="M8 10H16M8 14H12M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
                 <h3>Ask about this file</h3>
-                <p>Chat with AI about the code structure, functions, and relationships in <strong>{selectedFile.path}</strong></p>
+                <p>Chat with AI about the code structure, functions, and relationships in <strong>{selectedFile.name}</strong></p>
               </>
             )
           ) : (
