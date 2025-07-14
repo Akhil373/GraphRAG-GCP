@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 import { ThemeContext } from '../ThemeContext';
 
@@ -9,7 +9,6 @@ function GraphView({ graphData, selectedFile, isLoading, graphViewOpen }) {
   const [nodeSize, setNodeSize] = useState(8);
   const [linkStrength, setLinkStrength] = useState(0.6);
   const [highlightedNodes, setHighlightedNodes] = useState(new Set());
-  const theme = useContext(ThemeContext)
   
   // Helper function to get node color
   const getNodeColor = (node) => {
