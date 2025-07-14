@@ -206,10 +206,16 @@ function App() {
   };
 
   const handleSelectAll = () => {
-    if (selectedFiles.size === filteredFiles.length) {
-      setSelectedFiles(new Set()); // Deselect all
+    if (filteredFiles.every(file => selectedFiles.has(file))) {
+      // Deselect only the filtered files
+      const newSelectedFiles = new Set(selectedFiles);
+      filteredFiles.forEach(file => newSelectedFiles.delete(file));
+      setSelectedFiles(newSelectedFiles);
     } else {
-      setSelectedFiles(new Set(filteredFiles)); // Select all filtered files
+      // Add filtered files to selection (preserve previous selections)
+      const newSelectedFiles = new Set(selectedFiles);
+      filteredFiles.forEach(file => newSelectedFiles.add(file));
+      setSelectedFiles(newSelectedFiles);
     }
   };
   
@@ -281,9 +287,6 @@ function App() {
             percentage: percentage,
             currentFile: statusResponse.data.current_file || ''
           });
-          
-          // Update UI with current status
-          setStatusMessage(`${message} (${files_processed || 0}/${total_files || 0})`);
           
           // Check if processing is complete, partial success, or had an error
           if (is_complete === true) {
@@ -662,7 +665,7 @@ function App() {
           <>
             <div className="file-controls">
               <button onClick={handleSelectAll} className="btn btn-secondary">
-                {selectedFiles.size === filteredFiles.length && filteredFiles.length > 0 
+                {filteredFiles.every(file => selectedFiles.has(file)) && filteredFiles.length > 0 
                   ? 'Deselect All' 
                   : 'Select All'}
               </button>
