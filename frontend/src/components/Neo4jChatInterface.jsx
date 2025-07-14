@@ -11,7 +11,7 @@ import './Neo4jChatInterface.css';
 
 const RAG_API_BASE_URL = 'https://ragapi-service-722252932298.us-central1.run.app';
 
-function Neo4jChatInterface({ repoId, onBackToHome }) {
+function Neo4jChatInterface({ repoId }) {
   const { theme } = useContext(ThemeContext);
   const [selectedFile, setSelectedFile] = useState(null);
   const [files, setFiles] = useState([]);
@@ -422,19 +422,21 @@ function Neo4jChatInterface({ repoId, onBackToHome }) {
   }, [graphData, graphFilters]);
 
   // Handle starting a new session
-  const handleStartNew = () => {
-    if (onBackToHome) {
-      onBackToHome();
-    } else {
-      // Fallback if no callback provided
-      setChatHistory([]);
-      setSelectedFile(null);
-      setFileData(null);
-      setGraphData({ nodes: [], links: [] });
-      setChatQuery('');
-      setIsGraphViewOpen(false);
-    }
-  };
+  // const handleStartNew = () => {
+  //   if (onStartNew) {
+  //     onStartNew();
+  //   } else if (onBackToHome) {
+  //     onBackToHome();
+  //   } else {
+  //     // Fallback if no callback provided
+  //     setChatHistory([]);
+  //     setSelectedFile(null);
+  //     setFileData(null);
+  //     setGraphData({ nodes: [], links: [] });
+  //     setChatQuery('');
+  //     setIsGraphViewOpen(false);
+  //   }
+  // };
 
   // Filter files based on search term
   const filteredFiles = searchTerm
@@ -446,23 +448,10 @@ function Neo4jChatInterface({ repoId, onBackToHome }) {
 
   return (
     <div className="analyo-interface">
+      {/* Left Sidebar */}
       <PanelGroup direction="horizontal">
-        {/* Left Sidebar */}
-        <Panel minSize={20} defaultSize={25} maxSize={40}>
-          <aside className="left-sidebar">
-        <div className="sidebar-header">
-          <h1 className="app-name">Analyo</h1>
-          <button 
-            className="start-new-btn"
-            onClick={handleStartNew}
-            title="Start with New Repository"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M3 12h18m-9-9l9 9-9 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Start with New Repo
-          </button>
-        </div>
+        <Panel className="panel-sidebar" defaultSize={20} minSize={10}>
+      <aside className={`left-sidebar ${theme}-theme`}>
 
         <div className="sidebar-search">
           <div className="search-container">
@@ -495,12 +484,11 @@ function Neo4jChatInterface({ repoId, onBackToHome }) {
           </div>
         </div>
       </aside>
-        </Panel>
-        
-        <PanelResizeHandle className={`resize-handle ${theme}-theme`} />
+      </Panel>
+      <PanelResizeHandle className={`resize-handle ${theme}-theme`} />
 
-        {/* Main Content Area */}
-        <Panel minSize={50} className={`messages-panel ${theme}-theme`}>
+      {/* Main Content Area */}
+      <Panel minSize={50} className={`messages-panel ${theme}-theme`}>
       <main className = {`main-content ${theme}-theme`}>
         <div className={`chat-container ${theme}-theme`}>
           {/* View Graph Button */}

@@ -149,79 +149,16 @@ function App() {
     setShowConfirmDialog(false);
   };
 
-  // Handle navigation back to home - Clear entire repository state
-  const handleBackToHome = async () => {
-    try {
-      // Clear backend database first
-      await axios.post(CLEAR_DB_URL);
-      
-      // Reset UI state
-      setUiState('welcome');
-      setApiState(API_STATUS.IDLE);
-      setStatusMessage('');
-      
-      // Clear repository data
-      setRepoId('');
-      setGithubUrl('');
-      setFiles([]);
-      setSelectedFiles(new Set());
-      setExpandedFolders(new Set());
-      
-      // Clear chat and search state
-      setChatHistory([]);
-      setChatQuery('');
-      setFileSearchTerm('');
-      setIsChatLoading(false);
-      
-      // Clear file viewer state
-      setFileViewerOpen(false);
-      setViewingFile({ path: '', content: '' });
-      setIsLoadingFileContent(false);
-      
-      // Clear dialog states
-      setShowConfirmDialog(false);
-      setIsClearing(false);
-      
-      // Reset processing progress
-      setProcessingProgress({
-        total: 0,
-        processed: 0,
-        percentage: 0,
-        currentFile: ''
-      });
-      
-      // Reset header visibility
-      setIsHeaderVisible(true);
-      
-      console.log("Application and database cleared successfully");
-    } catch (error) {
-      console.error('Error clearing database during home navigation:', error);
-      // Still reset the UI state even if database clearing fails
-      setUiState('welcome');
-      setApiState(API_STATUS.IDLE);
-      setStatusMessage('');
-      setRepoId('');
-      setGithubUrl('');
-      setFiles([]);
-      setSelectedFiles(new Set());
-      setExpandedFolders(new Set());
-      setChatHistory([]);
-      setChatQuery('');
-      setFileSearchTerm('');
-      setIsChatLoading(false);
-      setFileViewerOpen(false);
-      setViewingFile({ path: '', content: '' });
-      setIsLoadingFileContent(false);
-      setShowConfirmDialog(false);
-      setIsClearing(false);
-      setProcessingProgress({
-        total: 0,
-        processed: 0,
-        percentage: 0,
-        currentFile: ''
-      });
-      setIsHeaderVisible(true);
-    }
+  // Handle navigation back to home
+  const handleBackToHome = () => {
+    setUiState('welcome');
+    setApiState(API_STATUS.IDLE);
+    setRepoId('');
+    setChatHistory([]);
+    setChatQuery('');
+    setSelectedFiles([]);
+    setFiles([]);
+    setGithubUrl('');
   };
 
   const handleSubmitRepo = async (e) => {

@@ -1,29 +1,5 @@
 /* App.css - Main application styles */
 
-/* CSS Variables for Theme Colors */
-:root {
-  /* Light Theme Colors */
-  --primary-light: #3b82f6;
-  --accent-light: #8b5cf6;
-  --border-light: #e5e7eb;
-  --bg-light: #ffffff;
-  --surface-light: #f9fafb;
-  --text-light: #111827;
-  --text-secondary-light: #6b7280;
-  
-  /* Dark Theme Colors */
-  --primary-dark: #6ab7ff;
-  --accent-dark: #a78bfa;
-  --border-dark: #374151;
-  --bg-dark: #111827;
-  --surface-dark: #1f2937;
-  --text-dark: #f9fafb;
-  --text-secondary-dark: #d1d5db;
-  
-  /* Transitions */
-  --transition-base: 0.2s ease;
-}
-
 .app-container {
   display: flex;
   flex-direction: column;
