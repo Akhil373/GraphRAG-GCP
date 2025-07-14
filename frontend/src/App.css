@@ -236,12 +236,11 @@
 
 .btn-secondary {
   background-color: transparent;
-  border: 1px solid;
+  border: 1px blue solid;
 }
 
 .light-theme .btn-secondary {
   color: var(--primary-light);
-  border-color: var(--primary-light);
 }
 
 .light-theme .btn-secondary:hover {
