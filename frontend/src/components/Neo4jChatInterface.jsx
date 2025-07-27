@@ -453,22 +453,6 @@ function Neo4jChatInterface({ repoId }) {
         <Panel className="panel-sidebar" defaultSize={20} minSize={10}>
       <aside className={`left-sidebar ${theme}-theme`}>
 
-        <div className="sidebar-search">
-          <div className="search-container">
-            <svg className="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2"/>
-              <path d="m21 21-4.35-4.35" stroke="currentColor" strokeWidth="2"/>
-            </svg>
-            <input
-              type="text"
-              className="search-input"
-              placeholder="Search files..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-        </div>
-
         <div className="file-tree">
           <div className="file-tree-header">
             <span>Repository Files</span>
