@@ -1,0 +1,17 @@
+name: Neo4j Heartbeat
+on:
+  schedule:
+    - cron: '0 12 */2 * *'  # Every 2 days at noon
+  workflow_dispatch:
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Keep Neo4j Active
+        run: |
+          curl -u "${{ secrets.NEO4J_USERNAME }}:${{ secrets.NEO4J_PASSWORD }}" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -d '{"statements": [{"statement": "RETURN datetime() AS heartbeat"}]}' \
+            "${{ secrets.NEO4J_URI }}"
