@@ -18,16 +18,14 @@ const API_STATUS = {
 function App() {
   const { theme } = useContext(ThemeContext);
   const [githubUrl, setGithubUrl] = useState('');
-  const [uiState, setUiState] = useState('welcome'); // welcome, loading, file-selection, chat
+  const [uiState, setUiState] = useState('welcome'); 
   const [statusMessage, setStatusMessage] = useState('');
   const [apiState, setApiState] = useState(API_STATUS.IDLE);
   
-  // State for file selection
   const [files, setFiles] = useState([]);
   const [selectedFiles, setSelectedFiles] = useState(new Set());
   const [repoId, setRepoId] = useState(null);
 
-  // State for file viewer modal
   const [fileViewerOpen, setFileViewerOpen] = useState(false);
   const [viewingFile, setViewingFile] = useState({ path: '', content: '' });
   const [isLoadingFileContent, setIsLoadingFileContent] = useState(false);
@@ -39,7 +37,6 @@ function App() {
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
   const prevScrollPos = useRef(0);
   
-  // State for the confirmation dialog
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
 
@@ -54,10 +51,8 @@ function App() {
   const RAG_API_URL = 'https://ragapi-service-722252932298.us-central1.run.app/api/chat';
   const CLEAR_DB_URL = 'https://ragapi-service-722252932298.us-central1.run.app/api/clear-database';
 
-  // State for expanded folders in the file browser
   const [expandedFolders, setExpandedFolders] = useState(new Set());
 
-  // Add this function to toggle folder expansion
   const toggleFolder = (folderPath) => {
     setExpandedFolders(prev => {
       const newSet = new Set(prev);
@@ -70,12 +65,10 @@ function App() {
     });
   };
 
-  // Scroll to bottom whenever chat history changes
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory]);
 
-  // Handle scroll in chat history to hide/show header
   useEffect(() => {
     const handleScroll = (e) => {
       if (!e.target.classList.contains('chat-history')) return;
@@ -103,12 +96,10 @@ function App() {
     };
   }, [isHeaderVisible]);
 
-  // Handle the "Start New" button click
   const handleStartNewClick = () => {
     setShowConfirmDialog(true);
   };
 
-  // Handle confirmation dialog confirmation
   const handleConfirmStartNew = async () => {
     setIsClearing(true);
     try {
@@ -144,12 +135,10 @@ function App() {
     }
   };
 
-  // Handle confirmation dialog cancellation
   const handleCancelStartNew = () => {
     setShowConfirmDialog(false);
   };
 
-  // Handle navigation back to home
   const handleBackToHome = () => {
     setUiState('welcome');
     setApiState(API_STATUS.IDLE);
@@ -258,7 +247,6 @@ function App() {
     }
   };
 
-  // New function to poll processing status
   const pollProcessingStatus = async (repoId) => {
     if (!repoId) return;
     
@@ -290,7 +278,6 @@ function App() {
           
           // Check if processing is complete, partial success, or had an error
           if (is_complete === true) {
-            // Set progress to 100% when complete
             setProcessingProgress(prev => ({
               ...prev, 
               percentage: 100,
@@ -342,12 +329,10 @@ function App() {
     }
   };
 
-  // Filter files based on search term
   const filteredFiles = fileSearchTerm
     ? files.filter(file => file.toLowerCase().includes(fileSearchTerm.toLowerCase()))
     : files;
   
-  // Helper function to get folder structure from file paths
   const getFolderStructure = (files) => {
     const structure = {};
     
@@ -374,7 +359,6 @@ function App() {
     return structure;
   };
   
-  // Count files in a folder structure
   const countFilesInFolder = (obj) => {
     return Object.entries(obj).reduce((count, [_, val]) => {
       if (typeof val === 'string') {
@@ -385,7 +369,6 @@ function App() {
     }, 0);
   };
   
-  // Get all file paths in a folder structure
   const getFilePaths = (obj, result = []) => {
     Object.entries(obj).forEach(([_, val]) => {
       if (typeof val === 'string') {
@@ -397,7 +380,6 @@ function App() {
     return result;
   };
 
-  // Function to fetch file contents
   const handleViewFile = async (filePath, e) => {
     e.stopPropagation(); // Prevent file selection when clicking view button
     
@@ -438,7 +420,6 @@ function App() {
     setViewingFile({ path: '', content: '' });
   };
 
-  // Helper function to render folder structure recursively
   const renderFolderTree = (structure, expandedFolders, toggleFolder, path = "", indent = 0) => {
     return Object.entries(structure).map(([key, value]) => {
       if (typeof value === 'string') {
@@ -519,7 +500,6 @@ function App() {
     });
   };
 
-  // New function to render the header
   const renderHeader = () => (
     <header className={`app-header ${!isHeaderVisible ? 'header-hidden' : ''}`}>
       <div className="logo-container">
@@ -733,7 +713,6 @@ function App() {
     );
   };
 
-  // File viewer modal component
   const renderFileViewerModal = () => {
     if (!fileViewerOpen) return null;
     

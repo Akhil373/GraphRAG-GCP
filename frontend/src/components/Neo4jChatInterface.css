@@ -38,6 +38,7 @@
   height: 100vh;
   z-index: 200;
   flex-shrink: 0;
+  transition: transform 0.3s ease-in-out;
 }
 
 .left-sidebar.light-theme {
@@ -49,7 +50,144 @@
   height: 100vh;
   z-index: 200;
   flex-shrink: 0;
+  transition: transform 0.3s ease-in-out;
 }
+/* Mobile Hamburger Button - Enhanced */
+.mobile-menu-toggle {
+  display: none !important; /* Force hide on desktop */
+  position: fixed;
+  top: 12%;
+  left: 16px;
+  z-index: 1000; /* Increased z-index */
+  background: #171717;
+  border: 1px solid #2d2d2d;
+  border-radius: 6px;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.mobile-menu-toggle.light-theme {
+  background: white;
+  border: 1px solid #e5e5e5;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  color: #333;
+}
+
+.mobile-menu-toggle.dark-theme {
+  background: #171717;
+  border: 1px solid #2d2d2d;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  color: #fff;
+}
+
+.mobile-menu-toggle:hover {
+  background: #2d2d2d;
+  transform: scale(1.05);
+}
+
+.mobile-menu-toggle.light-theme:hover {
+  background: #f5f5f5;
+  transform: scale(1.05);
+}
+
+.mobile-menu-toggle svg {
+  width: 20px;
+  height: 20px;
+  color: inherit; /* Use inherited color */
+  display: block;
+}
+
+/* Mobile Responsive Styles - Enhanced */
+@media (max-width: 768px) {
+  .mobile-menu-toggle {
+    display: block !important; /* Force show on mobile */
+  }
+  
+  /* Ensure no other element blocks the button */
+  .analyo-interface {
+    position: relative;
+  }
+  
+  .panel-sidebar {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    width: 280px !important;
+    height: 100vh;
+    z-index: 900; /* Lower than toggle button */
+    transform: translateX(-100%);
+    transition: transform 0.3s ease-in-out;
+  }
+  
+  .panel-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+  
+  .mobile-sidebar-overlay {
+    display: block;
+    z-index: 800; /* Lower than toggle and sidebar */
+  }
+  
+  .left-sidebar {
+    min-width: 280px;
+    width: 280px;
+  }
+  
+  .left-sidebar.light-theme {
+    min-width: 280px;
+    width: 280px;
+  }
+  
+  .resize-handle {
+    display: none !important;
+  }
+  
+  /* Adjust main content for mobile */
+  .panel-group {
+    width: 100% !important;
+  }
+  
+  /* Close button in sidebar for mobile */
+  .sidebar-close-btn {
+    display: block;
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    color: #888;
+    z-index: 10;
+    border-radius: 4px;
+  }
+  
+  .sidebar-close-btn:hover {
+    color: #fff;
+    background: rgba(255,255,255,0.1);
+  }
+  
+  .sidebar-close-btn.light-theme:hover {
+    color: #333;
+    background: rgba(0,0,0,0.1);
+  }
+}
+
+@media (min-width: 769px) {
+  .sidebar-close-btn {
+    display: none;
+  }
+}
+
+/* Ensure search container has proper spacing on mobile */
+@media (max-width: 768px) {
+  .sidebar-search {
+    padding-top: 60px; /* Space for close button */
+  }
+}
+
 
 /* Sidebar Header */
 .sidebar-header {
@@ -565,12 +703,12 @@
 .graph-overlay {
   position: fixed;
   top: 0;
-  left: 260px; /* Start after the sidebar */
+  left: 260px;
   right: 0;
   bottom: 0;
   background-color: rgba(0, 0, 0, 0.95);
   backdrop-filter: blur(4px);
-  z-index: 2000; /* Lower than sidebar but higher than main content */
+  z-index: 2000;
   animation: slideIn 0.3s ease-out;
 }
 
@@ -603,6 +741,9 @@
   padding: 1.5rem 2rem;
   border-bottom: 1px solid #2d2d2d;
   background-color: #1a1a1a;
+  position: relative;
+  z-index: 10;
+  flex-shrink: 0;
 }
 
 .graph-header h3 {
@@ -623,16 +764,25 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  min-width: 40px;
+  min-height: 40px;
 }
 
 .light-theme .close-graph-btn {
   background-color: white;
   color: black;
+  border: 1px solid #e5e5e5;
 }
 
 .close-graph-btn:hover {
   background-color: #404040;
   color: #ffffff;
+  transform: scale(1.05);
+}
+
+.light-theme .close-graph-btn:hover {
+  background-color: #f5f5f5;
+  color: #333;
 }
 
 .graph-content {
@@ -640,6 +790,7 @@
   display: flex;
   overflow: hidden;
 }
+
 
 .graph-controls-section {
   width: 300px;
@@ -657,6 +808,201 @@
   height: 100%;
   position: relative;
 }
+
+
+/* ===== MOBILE RESPONSIVE GRAPH OVERLAY ===== */
+@media (max-width: 768px) {
+
+  
+.graph-panel-group {
+  flex: 1;
+  height: 100%;
+}
+
+.graph-controls-panel {
+  background-color: #1a1a1a;
+  border-bottom: 1px solid #2d2d2d;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.graph-view-panel {
+  background-color: #212121;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+
+.graph-resize-handle {
+  height: 4px;
+  background-color: #2d2d2d;
+  cursor: row-resize;
+  transition: background-color 0.2s ease;
+  position: relative;
+  z-index: 100;
+  flex-shrink: 0;
+}
+
+.graph-resize-handle:hover {
+  background-color: #404040;
+}
+
+.graph-resize-handle:active {
+  background-color: #525252;
+}
+
+.light-theme .graph-resize-handle {
+  background-color: #e5e5e5;
+}
+
+.light-theme .graph-resize-handle:hover {
+  background-color: #d4d4d4;
+}
+
+.light-theme .graph-resize-handle:active {
+  background-color: #a3a3a3;
+}
+
+.graph-resize-handle::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 30px;
+  height: 2px;
+  background-color: #666;
+  border-radius: 1px;
+}
+
+.light-theme .graph-resize-handle::before {
+  background-color: #999;
+}
+
+
+
+  .graph-overlay {
+    left: 0 !important;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 3000;
+  }
+  
+  .graph-header {
+    padding: 1rem 1.5rem;
+    flex-wrap: nowrap;
+  }
+  
+  .graph-header h3 {
+    font-size: 1.1rem;
+    flex: 1;
+    margin-right: 1rem;
+  }
+  
+  .close-graph-btn {
+    flex-shrink: 0;
+    min-width: 44px;
+    min-height: 44px;
+  }
+  
+  .graph-content {
+    flex-direction: column;
+  }
+  
+  .graph-controls-section,
+  .graph-view-section {
+    display: none;
+  }
+  
+  .graph-panel-group {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .graph-controls-panel,
+  .graph-view-panel {
+    display: flex;
+    min-height: 100px;
+  }
+  
+  .graph-resize-handle {
+    display: block;
+    height: 6px;
+  }
+  
+  @keyframes slideIn {
+    from {
+      transform: translateY(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+}
+
+/* ===== LANDSCAPE MOBILE (TABLETS) ===== */
+@media (max-width: 1024px) and (min-width: 769px) {
+  .graph-overlay {
+    left: 0 !important;
+  }
+  
+  .graph-content {
+    flex-direction: row;
+  }
+  
+  .graph-controls-section {
+    width: 250px;
+    min-width: 250px;
+    display: flex;
+  }
+  
+  .graph-view-section {
+    display: flex;
+  }
+  
+  .graph-panel-group {
+    display: none !important;
+  }
+}
+
+/* ===== DESKTOP ===== */
+@media (min-width: 1025px) {
+  .graph-panel-group {          /* mobile layout */
+    display: none !important;
+  }
+  .graph-controls-section,      /* desktop layout */
+  .graph-view-section {
+    display: flex;
+  }
+}
+
+/* ===== VERY SMALL MOBILE SCREENS ===== */
+@media (max-width: 480px) {
+  .graph-header {
+    padding: 0.75rem 1rem;
+  }
+  
+  .graph-header h3 {
+    font-size: 1rem;
+  }
+  
+  .close-graph-btn {
+    min-width: 40px;
+    min-height: 40px;
+    padding: 0.375rem;
+  }
+  
+  .graph-resize-handle {
+    height: 8px;
+  }
+}
+
 
 /* File tree styles integration */
 .file-tree-content .file-item {
@@ -823,7 +1169,7 @@
   }
   
   .graph-controls-section {
-    width: 250px;
+    /* width: 250px; */
     min-width: 250px;
   }
   
