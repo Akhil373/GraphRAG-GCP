@@ -6,6 +6,20 @@ This project is an AI-powered intelligent discovery tool designed to help users 
 
 The system is composed of a frontend application, a backend service for repository handling, and several serverless functions for code processing and knowledge graph construction. The core idea is to transform legacy code into a structured knowledge graph that can be queried using natural language, powered by AI models.
 
+
+## Screenshots
+
+![App Screenshot](https://github.com/user-attachments/assets/79928967-7cd5-4631-b319-7f91b0f20499)
+<p align="center">
+  <em>Graph Visualization</em>
+</p>
+
+![App Screenshot](https://github.com/user-attachments/assets/3f176f4d-11fe-49c2-a3df-ca395e8958af)
+<p align="center">
+  <em>Main Chat UI</em>
+</p>
+
+
 ## Features
 
 *   **GitHub Repository Ingestion:** Users can provide a GitHub URL to import legacy code.
