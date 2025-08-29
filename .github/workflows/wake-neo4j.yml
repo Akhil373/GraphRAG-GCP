@@ -23,6 +23,6 @@ jobs:
       - name: Run wake script
         env:
           NEO4J_URI: ${{ secrets.NEO4J_URI }}
-          NEO4J_USER: ${{ secrets.NEO4J_USER }}
+          NEO4J_USER: ${{ secrets.NEO4J_USERNAME }}
           NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
         run: python wake_neo4j.py

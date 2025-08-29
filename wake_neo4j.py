@@ -27,7 +27,7 @@ if __name__ == "__main__":
     password = os.getenv("NEO4J_PASSWORD")
 
     if not uri or not user or not password:
-         raise RuntimeError(f"Missing credentials. Got NEO4J_URI={uri}, NEO4J_USER={user}, NEO4J_PASSWORD={'set' if password else 'missing'}") 
+         raise RuntimeError(f"Missing credentials. Got NEO4J_URI={uri}, NEO4J_USERNAME={user}, NEO4J_PASSWORD={'set' if password else 'missing'}") 
 
     print("Waking up Neo4j Aura Free instance...")
     wait_for_db(uri, user, password)
