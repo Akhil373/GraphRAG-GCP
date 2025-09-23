@@ -1,5 +1,7 @@
 # AI-Powered Intelligent Discovery Tool for Legacy Applications
 
+### (‼️Site currently down as GCP free trial has ended)
+
 This project is an AI-powered intelligent discovery tool designed to help users understand legacy application functionalities. It allows users to upload legacy code repositories via GitHub links, automatically parses and analyzes the code, constructs a knowledge graph, and provides a chat-like interface to query for features, requirements, dependencies, integration points, and database entities.
 
 ## Project Overview
